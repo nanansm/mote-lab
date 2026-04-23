@@ -1,0 +1,25 @@
+{
+  "name": "mote-lab",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.7.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "db:generate": "turbo run db:generate --filter=@mote-lab/db",
+    "db:migrate": "turbo run db:migrate --filter=@mote-lab/db",
+    "db:studio": "turbo run db:studio --filter=@mote-lab/db"
+  },
+  "devDependencies": {
+    "bcryptjs": "^3.0.3",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
