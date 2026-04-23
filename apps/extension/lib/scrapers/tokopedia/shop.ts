@@ -2,46 +2,46 @@ import type { TokopediaShop } from "../../types";
 
 function parseCountString(str: string): number {
   if (!str) return 0;
-  const s = str.trim();
+  const clean = str.trim();
 
-  const rbMatch = s.match(/([\d,.]+)\s*rb\+?/i);
+  // "5,6rb" / "44,4RB" → thousands
+  const rbMatch = clean.match(/^([\d,.]+)\s*rb\+?$/i);
   if (rbMatch) {
     const num = parseFloat(rbMatch[1].replace(/\./g, "").replace(",", "."));
     return Math.round(num * 1_000);
   }
 
-  const jtMatch = s.match(/([\d,.]+)\s*jt\+?/i);
+  // "1,2jt" / "1,7JT" → millions
+  const jtMatch = clean.match(/^([\d,.]+)\s*jt\+?$/i);
   if (jtMatch) {
     const num = parseFloat(jtMatch[1].replace(/\./g, "").replace(",", "."));
     return Math.round(num * 1_000_000);
   }
 
-  // K/M (less common but handle)
-  const kMatch = s.match(/([\d,.]+)\s*K\b/i);
-  if (kMatch) return Math.round(parseFloat(kMatch[1].replace(",", ".")) * 1_000);
-
-  const mMatch = s.match(/([\d,.]+)\s*M\b/i);
-  if (mMatch) return Math.round(parseFloat(mMatch[1].replace(",", ".")) * 1_000_000);
-
-  const plain = parseInt(s.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
+  const plain = parseInt(clean.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
   return isNaN(plain) ? 0 : plain;
+}
+
+function extractLabeled(bodyText: string, ...labels: string[]): string {
+  for (const label of labels) {
+    const pattern = new RegExp(`${label}:\\s*([^\\n]+)`, "i");
+    const value = bodyText.match(pattern)?.[1]?.trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 export function scrapeTokopediaShop(): TokopediaShop | null {
   const pathname = window.location.pathname;
-  const segments = pathname.split("/").filter(Boolean);
-  const username = segments[0];
-
+  const username = pathname.split("/").filter(Boolean)[0];
   if (!username) {
     console.log("[Tokopedia Shop] No username in pathname:", pathname);
     return null;
   }
 
-  // Name: prefer DOM element, fallback to page title
   const nameEl =
     document.querySelector('[data-testid="shopNameHeader"]') ||
-    document.querySelector('[data-testid="shopName"]') ||
-    document.querySelector('h1[class*="shopName"]');
+    document.querySelector('[data-testid="shopName"]');
   const shopName =
     nameEl?.textContent?.trim() ||
     document.title.split("|")[0].trim() ||
@@ -49,31 +49,27 @@ export function scrapeTokopediaShop(): TokopediaShop | null {
 
   const bodyText = document.body.innerText;
 
-  // Follower count — "X rb Pengikut" or "X Pengikut"
-  const followerMatch = bodyText.match(/([\d,.]+(?:\s*(?:rb|jt|K|M))?)\s{0,5}(?:Pengikut|Followers)/i);
-  const follower_count = followerMatch ? parseCountString(followerMatch[1]) : undefined;
+  // Tokopedia shop stat rows use the same "Label: value" format as Shopee
+  const produkRaw = extractLabeled(bodyText, "Produk", "Products");
+  const pengikutRaw = extractLabeled(bodyText, "Pengikut", "Followers");
+  const penilaianRaw = extractLabeled(bodyText, "Penilaian", "Rating");
 
-  // Rating — "4.8 dari 5" or "Rating Toko X"
-  const ratingMatch = bodyText.match(/(\d+(?:[.,]\d+)?)\s{0,5}(?:dari\s*5|\/\s*5)/i) ||
-    bodyText.match(/Rating\s{0,5}Toko\s{0,5}(\d+(?:[.,]\d+)?)/i);
+  const total_products = parseCountString(produkRaw);
+  const follower_count = parseCountString(pengikutRaw);
+
+  const ratingMatch = penilaianRaw.match(/^(\d+[.,]\d+)/);
   const rating = ratingMatch ? parseFloat(ratingMatch[1].replace(",", ".")) : undefined;
 
-  // Product count — "X Produk" (use \s{0,5} to avoid greedy cross-line match)
-  const productMatch = bodyText.match(/([\d,.]+(?:\s*(?:rb|jt|K|M))?)\s{0,5}Produk\b/i);
-  const total_products = productMatch ? parseCountString(productMatch[1]) : undefined;
+  // Location: "Dikirim dari Jakarta" or city listed near shop header
+  const locationMatch = bodyText.match(/(?:Dikirim dari|Lokasi)\s*:\s*([^\n]+)/i);
+  const location = locationMatch?.[1]?.trim();
 
-  // Location — "Dikirim dari X" or city badges near shop header
-  const locationMatch = bodyText.match(/(?:Dikirim dari|Lokasi)\s{0,5}([A-Za-z\s]+?)(?:\n|\r|$)/i);
-  const location = locationMatch ? locationMatch[1].trim() : undefined;
-
-  // Official store badge
   const is_official =
     document.querySelector('[data-testid="shopBadgeOS"]') !== null ||
     /Official Store/i.test(bodyText);
 
-  console.log("[Tokopedia Shop] username:", username, "| name:", shopName,
-    "| followers:", follower_count, "| products:", total_products,
-    "| rating:", rating, "| official:", is_official);
+  console.log("[Tokopedia Shop] Raw labels:", { produk: produkRaw, pengikut: pengikutRaw, penilaian: penilaianRaw });
+  console.log("[Tokopedia Shop] Parsed:", { username, name: shopName, follower_count, total_products, rating, is_official });
 
   return {
     external_id: username,

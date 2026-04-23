@@ -1,42 +1,39 @@
 import type { ShopeeShop } from "../../types";
 
+// Strict parse: only handle the formats that actually appear in Shopee shop stat labels.
+// "44,4RB" → 44400 | "75,8RB" → 75800 | "1,7JT" → 1700000
+// "147" → 147 | "1.700" → 1700 (dot = thousands separator in Indonesian)
 function parseCountString(str: string): number {
   if (!str) return 0;
-  const s = str.trim();
+  const clean = str.trim();
 
-  // Handle "X,YRB" / "X,YJT" — comma as decimal separator (Indonesian format)
-  const rbMatch = s.match(/([\d,.]+)\s*RB/i);
+  const rbMatch = clean.match(/^([\d,.]+)\s*RB$/i);
   if (rbMatch) {
     const num = parseFloat(rbMatch[1].replace(/\./g, "").replace(",", "."));
     return Math.round(num * 1_000);
   }
 
-  const jtMatch = s.match(/([\d,.]+)\s*JT/i);
+  const jtMatch = clean.match(/^([\d,.]+)\s*JT$/i);
   if (jtMatch) {
     const num = parseFloat(jtMatch[1].replace(/\./g, "").replace(",", "."));
     return Math.round(num * 1_000_000);
   }
 
-  // K/M suffix (less common in Shopee but handle anyway)
-  const kMatch = s.match(/([\d,.]+)\s*K\b/i);
-  if (kMatch) {
-    const num = parseFloat(kMatch[1].replace(/\./g, "").replace(",", "."));
-    return Math.round(num * 1_000);
-  }
+  // Plain number — dots are thousands separators (1.700 = 1700)
+  const plain = parseInt(clean.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
+  return isNaN(plain) ? 0 : plain;
+}
 
-  const mMatch = s.match(/([\d,.]+)\s*M\b/i);
-  if (mMatch) {
-    const num = parseFloat(mMatch[1].replace(/\./g, "").replace(",", "."));
-    return Math.round(num * 1_000_000);
-  }
-
-  // Plain number — dots are thousands separators in Indonesian (1.700 = 1700)
-  const num = parseInt(s.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
-  return isNaN(num) ? 0 : num;
+// Extract the value after an explicit "Label: <value>" pattern in bodyText.
+// This prevents random numbers elsewhere on the page (e.g. promo prices) from
+// being matched — Shopee shop stat rows always use this colon-separated format.
+function extractLabeled(bodyText: string, label: string): string {
+  const pattern = new RegExp(`${label}:\\s*([^\\n]+)`, "i");
+  return bodyText.match(pattern)?.[1]?.trim() ?? "";
 }
 
 export function scrapeShopeeShop(): ShopeeShop | null {
-  // Primary: __NEXT_DATA__ (has numeric shopid, ideal for product linking)
+  // Primary: __NEXT_DATA__ — has numeric shopid and clean structured data
   try {
     const el = document.getElementById("__NEXT_DATA__");
     if (el?.textContent) {
@@ -64,7 +61,7 @@ export function scrapeShopeeShop(): ShopeeShop | null {
     // fall through to DOM
   }
 
-  // DOM fallback: URL username + body text parsing
+  // DOM fallback: label-based extraction from body text
   const pathname = window.location.pathname;
   const username = pathname.replace(/^\//, "").split(/[#?]/)[0];
   if (!username) {
@@ -78,25 +75,26 @@ export function scrapeShopeeShop(): ShopeeShop | null {
 
   const bodyText = document.body.innerText;
 
-  // Use \s{0,5} instead of \s* to prevent greedy cross-line matching
-  // (avoids matching product prices far from the label keyword)
-  const followerMatch = bodyText.match(/([\d.,]+(?:RB|JT|K|M)?)\s{0,5}(?:Pengikut|Followers)/i);
-  const follower_count = followerMatch ? parseCountString(followerMatch[1]) : 0;
+  // Shopee shop info rows use explicit "Label: value" format, e.g.
+  // "Produk: 475", "Pengikut: 75,8RB", "Penilaian: 4.9 (15,8RB Penilaian)"
+  const produkRaw = extractLabeled(bodyText, "Produk");
+  const pengikutRaw = extractLabeled(bodyText, "Pengikut");
+  const penilaianRaw = extractLabeled(bodyText, "Penilaian");
 
-  const ratingMatch = bodyText.match(/(\d\.\d)\s{0,5}(?:\/\s*5\.?0?)?\s{0,5}(?:Penilaian|Rating)/i);
+  const total_products = parseCountString(produkRaw);
+  const follower_count = parseCountString(pengikutRaw);
+
+  // Rating is the leading decimal before the parenthetical: "4.9 (15,8RB Penilaian)" → 4.9
+  const ratingMatch = penilaianRaw.match(/^(\d+\.\d+)/);
   const rating = ratingMatch ? parseFloat(ratingMatch[1]) : undefined;
 
-  const productMatch = bodyText.match(/([\d.,]+(?:RB|JT|K|M)?)\s{0,5}Produk\b/i);
-  const total_products = productMatch ? parseCountString(productMatch[1]) : 0;
-
   const is_official =
-    /shopee mall/i.test(bodyText) ||
-    document.querySelector('[alt*="Mall"], [alt*="mall"]') !== null;
+    (/shopee mall/i.test(bodyText) ||
+      document.querySelector('img[alt*="Mall"], img[alt*="mall"]') !== null ||
+      document.querySelector('[class*="mall"]') !== null);
 
-  console.log("[Shopee Shop] DOM fallback — username:", username,
-    "| followers raw:", followerMatch?.[1], "→", follower_count,
-    "| products raw:", productMatch?.[1], "→", total_products,
-    "| rating:", rating);
+  console.log("[Shopee Shop] Raw labels:", { produk: produkRaw, pengikut: pengikutRaw, penilaian: penilaianRaw });
+  console.log("[Shopee Shop] Parsed:", { username, name: shopName, follower_count, total_products, rating, is_official });
 
   return {
     external_id: username,
