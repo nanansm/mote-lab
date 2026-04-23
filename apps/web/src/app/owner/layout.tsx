@@ -8,13 +8,12 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
-    redirect("/login");
+    redirect("/");
   }
 
-  // Type assertion needed because better-auth types may not include custom fields
   const role = (session.user as { role?: string }).role;
   if (role !== "owner") {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   return (

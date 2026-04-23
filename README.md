@@ -131,6 +131,24 @@ REDIS_URL=redis://default:PASSWORD@mote_mote-lab-redis:6379
 
 ---
 
+## Internal Owner Access
+
+> **Jangan share URL ini ke publik.**
+
+Owner panel login: `/control-panel/login`
+
+- URL ini tidak ter-link dari mana pun di public UI
+- Gunakan email dan password owner (di-set via `OWNER_EMAIL` + `OWNER_PASSWORD_HASH`)
+- Rate limit: 5 attempt per 15 menit per IP
+- `/owner/*` hanya accessible setelah login owner berhasil
+
+Generate password hash baru:
+```bash
+node -e "const b = require('bcryptjs'); b.hash('password', 10).then(console.log)"
+```
+
+---
+
 ## Google OAuth Setup
 
 1. Buka Google Cloud Console → project Mote Blaster yang existing

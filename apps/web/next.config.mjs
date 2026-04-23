@@ -6,7 +6,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  // Needed so the standalone build includes monorepo packages
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@mote-lab/db", "@mote-lab/shared"],
   experimental: {
@@ -19,6 +18,22 @@ const nextConfig = {
         hostname: "lh3.googleusercontent.com",
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/control-panel/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
+        source: "/owner/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+    ];
   },
 };
 

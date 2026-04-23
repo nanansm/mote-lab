@@ -6,18 +6,28 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
   const isAuthenticated = !!sessionCookie;
 
-  const protectedRoutes = ["/dashboard", "/owner", "/onboarding"];
+  const protectedRoutes = ["/dashboard", "/onboarding"];
+  const ownerRoutes = ["/owner"];
   const authRoutes = ["/login", "/register"];
 
   const isProtected = protectedRoutes.some((r) => pathname.startsWith(r));
+  const isOwnerRoute = ownerRoutes.some((r) => pathname.startsWith(r));
   const isAuthPage = authRoutes.some((r) => pathname === r);
 
+  // /owner/* — requires session; role check is done in owner/layout.tsx (server component)
+  // Non-owners are redirected to / (not /control-panel/login — don't leak the URL)
+  if (isOwnerRoute && !isAuthenticated) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // /dashboard, /onboarding — requires session
   if (isProtected && !isAuthenticated) {
     const url = new URL("/login", request.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }
 
+  // /login, /register — redirect to dashboard if already logged in
   if (isAuthPage && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

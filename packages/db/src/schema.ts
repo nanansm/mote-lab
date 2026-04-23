@@ -7,6 +7,7 @@ import {
   date,
   unique,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 // better-auth managed tables
 export const users = pgTable("users", {
@@ -88,6 +89,43 @@ export const usageQuota = pgTable(
   (table) => [unique().on(table.userId, table.date)]
 );
 
+// Relations (TypeScript only — no DB migration needed)
+export const usersRelations = relations(users, ({ many }) => ({
+  subscriptions: many(subscriptions),
+  sessions: many(sessions),
+  accounts: many(accounts),
+  usageQuota: many(usageQuota),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const usageQuotaRelations = relations(usageQuota, ({ one }) => ({
+  user: one(users, {
+    fields: [usageQuota.userId],
+    references: [users.id],
+  }),
+}));
+
+// Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

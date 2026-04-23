@@ -36,7 +36,7 @@ export default async function OwnerPage() {
       limit: 50,
       with: {
         user: { columns: { name: true, email: true } },
-      } as never,
+      },
     }),
   ]);
 
