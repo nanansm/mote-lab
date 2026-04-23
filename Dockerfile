@@ -46,8 +46,9 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 # Copy DB migrations for runtime migration runner
 COPY --from=builder /app/packages/db/drizzle ./packages/db/drizzle
 
-# Copy migration startup script + its deps
+# Copy migration + seed scripts and their deps
 COPY --from=builder /app/scripts/migrate-and-start.mjs ./scripts/migrate-and-start.mjs
+COPY --from=builder /app/scripts/seed-owner.mjs ./scripts/seed-owner.mjs
 COPY --from=builder /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=builder /app/node_modules/postgres ./node_modules/postgres
 

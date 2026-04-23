@@ -138,14 +138,16 @@ REDIS_URL=redis://default:PASSWORD@mote_mote-lab-redis:6379
 Owner panel login: `/control-panel/login`
 
 - URL ini tidak ter-link dari mana pun di public UI
-- Gunakan email dan password owner (di-set via `OWNER_EMAIL` + `OWNER_PASSWORD_HASH`)
+- Set env vars: `OWNER_EMAIL` + `OWNER_PASSWORD` (plain text, tidak di-hash)
 - Rate limit: 5 attempt per 15 menit per IP
 - `/owner/*` hanya accessible setelah login owner berhasil
 
-Generate password hash baru:
+**Setup owner account (sekali saja, atau saat user record tidak ada):**
 ```bash
-node -e "const b = require('bcryptjs'); b.hash('password', 10).then(console.log)"
+DATABASE_URL=... OWNER_EMAIL=... node scripts/seed-owner.mjs
 ```
+
+**Ganti password:** Cukup update `OWNER_PASSWORD` di Easypanel env → redeploy. Tidak perlu hash.
 
 ---
 
