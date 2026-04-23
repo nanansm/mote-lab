@@ -5,6 +5,7 @@ interface FABProps {
 }
 
 export function FAB({ onClick, active = false, queued = 0 }: FABProps) {
+  console.log("[Mote LAB] FAB rendered, active:", active, "queued:", queued);
   return (
     <button
       onClick={onClick}
@@ -14,8 +15,8 @@ export function FAB({ onClick, active = false, queued = 0 }: FABProps) {
         bottom: "24px",
         right: "24px",
         zIndex: 2147483647,
-        width: "48px",
-        height: "48px",
+        width: "52px",
+        height: "52px",
         borderRadius: "50%",
         background: active ? "#1E40AF" : "#374151",
         color: "#fff",
@@ -24,15 +25,14 @@ export function FAB({ onClick, active = false, queued = 0 }: FABProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-        fontSize: "20px",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        fontSize: "18px",
+        fontWeight: "bold",
+        fontFamily: "system-ui, sans-serif",
         transition: "background 0.2s",
       }}
     >
-      {/* Mote logo mark — simplified M */}
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 18V6l9 9 9-9v12" />
-      </svg>
+      M
       {queued > 0 && (
         <span
           style={{

@@ -12,7 +12,28 @@ export const config: PlasmoCSConfig = {
   run_at: "document_idle",
 };
 
+console.log("[Mote LAB] tiktok.tsx content script loaded");
+
+export const getStyle = () => {
+  console.log("[Mote LAB] getStyle called");
+  const style = document.createElement("style");
+  style.textContent = `
+    :host {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 0 !important;
+      height: 0 !important;
+      z-index: 2147483647 !important;
+      overflow: visible !important;
+      display: block !important;
+    }
+  `;
+  return style;
+};
+
 export const getRootContainer = async () => {
+  console.log("[Mote LAB] getRootContainer called");
   const container = document.createElement("div");
   container.id = "mote-lab-tiktok-overlay";
   document.body.appendChild(container);
@@ -22,6 +43,7 @@ export const getRootContainer = async () => {
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
 export default function TiktokOverlay() {
+  console.log("[Mote LAB] TiktokOverlay rendered");
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [itemCount, setItemCount] = useState<number>(0);

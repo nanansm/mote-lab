@@ -12,8 +12,28 @@ export const config: PlasmoCSConfig = {
   run_at: "document_idle",
 };
 
-// Plasmo mounts the default export into this container (no Shadow DOM).
+console.log("[Mote LAB] shopee.tsx content script loaded");
+
+export const getStyle = () => {
+  console.log("[Mote LAB] getStyle called");
+  const style = document.createElement("style");
+  style.textContent = `
+    :host {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 0 !important;
+      height: 0 !important;
+      z-index: 2147483647 !important;
+      overflow: visible !important;
+      display: block !important;
+    }
+  `;
+  return style;
+};
+
 export const getRootContainer = async () => {
+  console.log("[Mote LAB] getRootContainer called");
   const container = document.createElement("div");
   container.id = "mote-lab-shopee-overlay";
   document.body.appendChild(container);
@@ -23,6 +43,7 @@ export const getRootContainer = async () => {
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
 export default function ShopeeOverlay() {
+  console.log("[Mote LAB] ShopeeOverlay rendered");
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [itemCount, setItemCount] = useState<number>(0);
