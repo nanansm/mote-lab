@@ -38,3 +38,16 @@ export function formatRelativeDate(date: Date | string): string {
 export function generateId(): string {
   return crypto.randomUUID();
 }
+
+export function formatIDR(num: number): string {
+  if (num >= 1_000_000_000) return `Rp ${(num / 1_000_000_000).toFixed(2)} M`;
+  if (num >= 1_000_000) return `Rp ${(num / 1_000_000).toFixed(2)} JT`;
+  if (num >= 1_000) return `Rp ${(num / 1_000).toFixed(0)} RB`;
+  return `Rp ${Math.round(num).toLocaleString("id-ID")}`;
+}
+
+// Estimated omset: total_sold × price, amortised over 6-month assumption (same as extension)
+export function estimateOmset(currentPrice: number | null, totalSold: number | null) {
+  const total = (currentPrice ?? 0) * (totalSold ?? 0);
+  return { total, monthly: total / 6 };
+}

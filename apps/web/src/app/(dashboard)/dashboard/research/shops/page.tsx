@@ -1,21 +1,20 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@mote-lab/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StoreIcon, ExternalLinkIcon } from "lucide-react";
+import { formatIDR } from "@/lib/utils";
 
 export default async function ResearchShopsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
 
   const researchRows = await db
-    .select({
-      shopId: schema.userResearch.shopId,
-    })
+    .select({ shopId: schema.userResearch.shopId })
     .from(schema.userResearch)
     .where(
       and(
@@ -31,10 +30,36 @@ export default async function ResearchShopsPage() {
 
   const shops =
     shopIds.length > 0
-      ? await db.query.shops.findMany({
-          where: (s, { inArray }) => inArray(s.id, shopIds),
-        })
+      ? await db.query.shops.findMany({ where: (s, { inArray }) => inArray(s.id, shopIds) })
       : [];
+
+  // Fetch omset estimates by joining products with shops via externalId
+  const shopExternalIds = shops.map((s) => s.externalId).filter(Boolean);
+  const omsetRows =
+    shopExternalIds.length > 0
+      ? await db
+          .select({
+            shopExternalId: schema.products.shopId,
+            marketplace: schema.products.marketplace,
+            totalOmset: sql<number>`COALESCE(SUM(${schema.products.currentPrice} * ${schema.products.totalSold}), 0)`,
+            productCount: sql<number>`COUNT(*)::int`,
+          })
+          .from(schema.products)
+          .where(
+            and(
+              sql`${schema.products.shopId} IS NOT NULL`,
+              inArray(schema.products.shopId, shopExternalIds),
+            ),
+          )
+          .groupBy(schema.products.shopId, schema.products.marketplace)
+      : [];
+
+  const omsetMap = new Map(
+    omsetRows.map((r) => [`${r.marketplace}__${r.shopExternalId}`, r]),
+  );
+
+  const summaryTotalOmset = omsetRows.reduce((s, r) => s + Number(r.totalOmset), 0);
+  const summaryMonthly = summaryTotalOmset / 6;
 
   if (shops.length === 0) {
     return (
@@ -62,11 +87,33 @@ export default async function ResearchShopsPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-6xl">
+    <div className="space-y-5 max-w-6xl">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Riset Toko</h1>
-        <p className="text-slate-600 mt-0.5 text-sm">{shops.length} toko</p>
+        <p className="text-slate-600 mt-0.5 text-sm">{shops.length} toko ter-track</p>
       </div>
+
+      {/* Summary cards */}
+      {summaryTotalOmset > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Omset", value: formatIDR(summaryTotalOmset) },
+            { label: "Est. Omset / Bulan", value: formatIDR(summaryMonthly) },
+            { label: "Toko Tracked", value: shops.length.toString() },
+            {
+              label: "Total Produk",
+              value: omsetRows.reduce((s, r) => s + Number(r.productCount), 0).toLocaleString("id-ID"),
+            },
+          ].map((m) => (
+            <Card key={m.label} className="bg-slate-50 border-slate-200">
+              <CardContent className="p-4">
+                <p className="text-xs text-slate-500 mb-1">{m.label}</p>
+                <p className="text-lg font-bold text-slate-900">{m.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto rounded-xl border bg-white">
@@ -78,68 +125,89 @@ export default async function ResearchShopsPage() {
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Followers</th>
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Produk</th>
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Rating</th>
+              <th className="text-right px-4 py-3 text-slate-600 font-medium">Est. Omset/Bln</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {shops.map((s) => (
-              <tr key={s.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/dashboard/research/shops/${encodeURIComponent(s.id)}`}
-                    className="font-medium text-slate-800 hover:text-[#1E40AF]"
-                  >
-                    {s.name}
-                  </Link>
-                  {s.username && (
-                    <p className="text-xs text-slate-400">@{s.username}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  {s.followerCount?.toLocaleString("id-ID") ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  {s.totalProducts?.toLocaleString("id-ID") ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  {s.rating ? `${s.rating.toFixed(1)} ★` : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-[#1E40AF]">
-                    <ExternalLinkIcon className="size-4" />
-                  </a>
-                </td>
-              </tr>
-            ))}
+            {shops.map((s) => {
+              const omset = omsetMap.get(`${s.marketplace}__${s.externalId}`);
+              const monthly = omset ? Number(omset.totalOmset) / 6 : null;
+              return (
+                <tr key={s.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/research/shops/${encodeURIComponent(s.id)}`}
+                      className="font-medium text-slate-800 hover:text-[#1E40AF]"
+                    >
+                      {s.name}
+                    </Link>
+                    {s.username && <p className="text-xs text-slate-400">@{s.username}</p>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">
+                    {s.followerCount?.toLocaleString("id-ID") ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">
+                    {s.totalProducts?.toLocaleString("id-ID") ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">
+                    {s.rating ? `${s.rating.toFixed(1)} ★` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-[#1E40AF]">
+                    {monthly !== null ? formatIDR(monthly) : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-[#1E40AF]">
+                      <ExternalLinkIcon className="size-4" />
+                    </a>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {shops.map((s) => (
-          <Card key={s.id}>
-            <CardContent className="p-4">
-              <Link
-                href={`/dashboard/research/shops/${encodeURIComponent(s.id)}`}
-                className="font-medium text-slate-800 hover:text-[#1E40AF] text-sm"
-              >
-                {s.name}
-              </Link>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
-                {s.followerCount && (
-                  <span className="text-xs text-slate-500">{s.followerCount.toLocaleString("id-ID")} followers</span>
+        {shops.map((s) => {
+          const omset = omsetMap.get(`${s.marketplace}__${s.externalId}`);
+          const monthly = omset ? Number(omset.totalOmset) / 6 : null;
+          return (
+            <Card key={s.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <Link
+                    href={`/dashboard/research/shops/${encodeURIComponent(s.id)}`}
+                    className="font-medium text-slate-800 hover:text-[#1E40AF] text-sm"
+                  >
+                    {s.name}
+                  </Link>
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-slate-400 shrink-0">
+                    <ExternalLinkIcon className="size-3.5" />
+                  </a>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                  <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
+                  {s.followerCount && (
+                    <span className="text-xs text-slate-500">{s.followerCount.toLocaleString("id-ID")} pengikut</span>
+                  )}
+                  {s.rating && <span className="text-xs text-slate-500">{s.rating.toFixed(1)} ★</span>}
+                </div>
+                {monthly !== null && (
+                  <p className="text-sm font-semibold text-[#1E40AF] mt-2">
+                    Est. {formatIDR(monthly)} / bln
+                  </p>
                 )}
-                {s.rating && <span className="text-xs text-slate-500">{s.rating.toFixed(1)} ★</span>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+      <p className="text-xs text-slate-400">*Estimasi omset = total terjual × harga, asumsi 6 bulan aktif</p>
     </div>
   );
 }

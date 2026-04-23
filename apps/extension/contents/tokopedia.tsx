@@ -2,10 +2,12 @@ import type { PlasmoCSConfig } from "plasmo";
 import { useEffect, useState } from "react";
 import { FAB } from "../components/overlay/FAB";
 import { SidePanel } from "../components/overlay/SidePanel";
+import { aggregateEstimate, type AggregateEstimate } from "../lib/estimate";
 import { detectTokopediaPageType, type TokopediaPageType } from "../lib/scrapers/tokopedia/detect";
 import { scrapeTokopediaProductList } from "../lib/scrapers/tokopedia/productList";
 import { scrapeTokopediaProductDetail } from "../lib/scrapers/tokopedia/productDetail";
 import { scrapeTokopediaShop } from "../lib/scrapers/tokopedia/shop";
+import type { TokopediaProduct } from "../lib/types";
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.tokopedia.com/*", "https://tokopedia.com/*"],
@@ -56,6 +58,8 @@ export default function TokopediaOverlay() {
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [authenticated, setAuthenticated] = useState(true);
+  const [products, setProducts] = useState<TokopediaProduct[]>([]);
+  const [estimate, setEstimate] = useState<AggregateEstimate | undefined>();
   const [detectedPageType, setDetectedPageType] = useState<TokopediaPageType>("unknown");
 
   useEffect(() => {
@@ -96,22 +100,42 @@ export default function TokopediaOverlay() {
         return;
       }
 
-      if (pageType === "product-list") {
-        const products = await new Promise<ReturnType<typeof scrapeTokopediaProductList>>((resolve) => {
+      if (pageType === "product-list" || pageType === "shop") {
+        // For shop pages: push shop info first
+        if (pageType === "shop") {
+          const shop = await new Promise<ReturnType<typeof scrapeTokopediaShop>>((resolve) => {
+            requestIdleCallback(() => resolve(scrapeTokopediaShop()), { timeout: 3000 });
+          });
+          if (shop) {
+            console.log("[Mote LAB] Pushing Tokopedia shop:", shop.name, "| id:", shop.external_id);
+            await new Promise<void>((resolve) =>
+              chrome.runtime.sendMessage(
+                { type: "INGEST_TOKOPEDIA_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
+                () => resolve(),
+              ),
+            );
+          } else {
+            console.warn("[Mote LAB] scrapeTokopediaShop() returned null");
+          }
+        }
+
+        const scraped = await new Promise<ReturnType<typeof scrapeTokopediaProductList>>((resolve) => {
           requestIdleCallback(() => resolve(scrapeTokopediaProductList()), { timeout: 3000 });
         });
 
-        if (products.length === 0) {
+        if (scraped.length === 0) {
           setStatus("error");
-          setError("Tidak ada produk ditemukan. Scraper Tokopedia masih dalam pengembangan.");
+          setError("Tidak ada produk ditemukan di halaman ini");
           return;
         }
 
-        setItemCount(products.length);
+        setProducts(scraped);
+        setEstimate(aggregateEstimate(scraped));
+        setItemCount(scraped.length);
         setStatus("sending");
 
-        const batch = products.slice(0, 50);
-        const res = await new Promise<{ ok: boolean; queued?: number }>((resolve) =>
+        const batch = scraped.slice(0, 50);
+        const res = await new Promise<{ ok: boolean; queued?: number; offline?: boolean }>((resolve) =>
           chrome.runtime.sendMessage(
             { type: "INGEST_TOKOPEDIA_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: batch } },
             resolve,
@@ -132,7 +156,7 @@ export default function TokopediaOverlay() {
 
         if (!product) {
           setStatus("error");
-          setError("Scraper detail produk Tokopedia masih dalam pengembangan.");
+          setError("Tidak bisa mengambil detail produk");
           return;
         }
 
@@ -148,29 +172,6 @@ export default function TokopediaOverlay() {
 
         setStatus(res.ok ? "done" : "error");
         if (!res.ok) setError("Gagal mengirim data");
-      } else if (pageType === "shop") {
-        const shop = await new Promise<ReturnType<typeof scrapeTokopediaShop>>((resolve) => {
-          requestIdleCallback(() => resolve(scrapeTokopediaShop()), { timeout: 3000 });
-        });
-
-        if (!shop) {
-          setStatus("error");
-          setError("Scraper toko Tokopedia masih dalam pengembangan.");
-          return;
-        }
-
-        setItemCount(1);
-        setStatus("sending");
-
-        const res = await new Promise<{ ok: boolean }>((resolve) =>
-          chrome.runtime.sendMessage(
-            { type: "INGEST_TOKOPEDIA_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
-            resolve,
-          ),
-        );
-
-        setStatus(res.ok ? "done" : "error");
-        if (!res.ok) setError("Gagal mengirim data toko");
       }
 
       chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => {
@@ -185,7 +186,9 @@ export default function TokopediaOverlay() {
 
   const handleOpenPanel = () => {
     setOpen(true);
-    handleScrape();
+    if (products.length === 0) {
+      handleScrape();
+    }
   };
 
   const statusForPanel: Status = !authenticated ? "unauthenticated" : status;
@@ -207,6 +210,8 @@ export default function TokopediaOverlay() {
         quota={quota}
         error={error}
         onScrape={handleScrape}
+        estimate={estimate}
+        products={products}
       />
     </>
   );
