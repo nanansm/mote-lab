@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@mote-lab/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,11 +23,10 @@ export default async function ResearchProductsPage({
   const pageSize = 20;
   const offset = (page - 1) * pageSize;
 
-  // Get products this user has researched
+  // Get products this user has researched, one row per product, most-recent first
   const researchRows = await db
-    .selectDistinctOn([schema.userResearch.productId], {
+    .select({
       productId: schema.userResearch.productId,
-      lastResearched: sql<Date>`max(${schema.userResearch.createdAt})`.as("last_researched"),
     })
     .from(schema.userResearch)
     .where(

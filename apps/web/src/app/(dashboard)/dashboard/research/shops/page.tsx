@@ -13,7 +13,7 @@ export default async function ResearchShopsPage() {
   if (!session) return null;
 
   const researchRows = await db
-    .selectDistinctOn([schema.userResearch.shopId], {
+    .select({
       shopId: schema.userResearch.shopId,
     })
     .from(schema.userResearch)
@@ -24,7 +24,8 @@ export default async function ResearchShopsPage() {
         sql`${schema.userResearch.shopId} IS NOT NULL`,
       ),
     )
-    .orderBy(schema.userResearch.shopId, sql`max(${schema.userResearch.createdAt}) DESC`);
+    .groupBy(schema.userResearch.shopId)
+    .orderBy(sql`max(${schema.userResearch.createdAt}) DESC`);
 
   const shopIds = researchRows.map((r) => r.shopId).filter(Boolean) as string[];
 

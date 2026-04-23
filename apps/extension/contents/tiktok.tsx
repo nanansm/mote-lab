@@ -1,6 +1,5 @@
 import type { PlasmoCSConfig } from "plasmo";
 import { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { FAB } from "../components/overlay/FAB";
 import { SidePanel } from "../components/overlay/SidePanel";
 import { detectTiktokPageType } from "../lib/scrapers/tiktok/detect";
@@ -13,9 +12,16 @@ export const config: PlasmoCSConfig = {
   run_at: "document_idle",
 };
 
+export const getRootContainer = async () => {
+  const container = document.createElement("div");
+  container.id = "mote-lab-tiktok-overlay";
+  document.body.appendChild(container);
+  return container;
+};
+
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
-function TiktokOverlay() {
+export default function TiktokOverlay() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [itemCount, setItemCount] = useState<number>(0);
@@ -27,11 +33,14 @@ function TiktokOverlay() {
   const pageType = detectTiktokPageType(window.location.href);
 
   useEffect(() => {
+    console.log("[Mote LAB] TikTok content script aktif:", window.location.href);
     chrome.runtime.sendMessage({ type: "GET_AUTH_STATUS" }, (res) => {
+      if (chrome.runtime.lastError) return;
       if (!res?.authenticated) setAuthenticated(false);
       if (res?.quota) setQuota(res.quota);
     });
     chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => {
+      if (chrome.runtime.lastError) return;
       setQueueLen(res?.length ?? 0);
     });
   }, []);
@@ -134,7 +143,10 @@ function TiktokOverlay() {
         setError("Halaman ini tidak didukung. Coba di halaman produk atau toko TikTok.");
       }
 
-      chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => setQueueLen(res?.length ?? 0));
+      chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => {
+        if (chrome.runtime.lastError) return;
+        setQueueLen(res?.length ?? 0);
+      });
     } catch (err) {
       setStatus("error");
       setError(String(err));
@@ -168,9 +180,3 @@ function TiktokOverlay() {
     </>
   );
 }
-
-const container = document.createElement("div");
-container.id = "mote-lab-overlay-tiktok";
-document.body.appendChild(container);
-const root = createRoot(container);
-root.render(<TiktokOverlay />);
