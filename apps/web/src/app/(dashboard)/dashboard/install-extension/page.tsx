@@ -71,7 +71,7 @@ const steps = [
     step: 6,
     icon: ShoppingBagIcon,
     title: "Mulai Riset!",
-    desc: "Buka Shopee atau TikTok Shop. Extension akan otomatis mengumpulkan data produk.",
+    desc: "Buka Shopee atau Tokopedia. Extension akan otomatis mengumpulkan data produk.",
   },
 ];
 

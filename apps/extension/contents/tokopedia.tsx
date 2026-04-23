@@ -2,20 +2,19 @@ import type { PlasmoCSConfig } from "plasmo";
 import { useEffect, useState } from "react";
 import { FAB } from "../components/overlay/FAB";
 import { SidePanel } from "../components/overlay/SidePanel";
-import { detectTiktokPageType } from "../lib/scrapers/tiktok/detect";
-import { scrapeTiktokProductDetail } from "../lib/scrapers/tiktok/productDetail";
-import { scrapeTiktokProductList } from "../lib/scrapers/tiktok/productList";
-import { scrapeTiktokShop } from "../lib/scrapers/tiktok/shop";
+import { detectTokopediaPageType, type TokopediaPageType } from "../lib/scrapers/tokopedia/detect";
+import { scrapeTokopediaProductList } from "../lib/scrapers/tokopedia/productList";
+import { scrapeTokopediaProductDetail } from "../lib/scrapers/tokopedia/productDetail";
+import { scrapeTokopediaShop } from "../lib/scrapers/tokopedia/shop";
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://*.tiktok.com/*"],
+  matches: ["https://www.tokopedia.com/*", "https://tokopedia.com/*"],
   run_at: "document_idle",
 };
 
-console.log("[Mote LAB] tiktok.tsx content script loaded");
+console.log("[Mote LAB] tokopedia.tsx content script loaded");
 
 export const getStyle = () => {
-  console.log("[Mote LAB] getStyle called");
   const style = document.createElement("style");
   style.textContent = `
     :host {
@@ -33,17 +32,23 @@ export const getStyle = () => {
 };
 
 export const getRootContainer = async () => {
-  console.log("[Mote LAB] getRootContainer called");
   const container = document.createElement("div");
-  container.id = "mote-lab-tiktok-overlay";
+  container.id = "mote-lab-tokopedia-overlay";
   document.body.appendChild(container);
   return container;
 };
 
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
-export default function TiktokOverlay() {
-  console.log("[Mote LAB] TiktokOverlay rendered");
+const PAGE_TYPE_LABEL: Record<TokopediaPageType, string> = {
+  "product-list": "List Produk",
+  "product-detail": "Detail Produk",
+  "shop": "Toko",
+  "unknown": "Tidak Didukung",
+};
+
+export default function TokopediaOverlay() {
+  console.log("[Mote LAB] TokopediaOverlay rendered");
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [itemCount, setItemCount] = useState<number>(0);
@@ -51,11 +56,10 @@ export default function TiktokOverlay() {
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [authenticated, setAuthenticated] = useState(true);
-
-  const pageType = detectTiktokPageType(window.location.href);
+  const [detectedPageType, setDetectedPageType] = useState<TokopediaPageType>("unknown");
 
   useEffect(() => {
-    console.log("[Mote LAB] TikTok content script aktif:", window.location.href);
+    console.log("[Mote LAB] Tokopedia content script aktif:", window.location.href);
     chrome.runtime.sendMessage({ type: "GET_AUTH_STATUS" }, (res) => {
       if (chrome.runtime.lastError) return;
       if (!res?.authenticated) setAuthenticated(false);
@@ -69,12 +73,10 @@ export default function TiktokOverlay() {
 
   async function handleScrape() {
     if (!authenticated) {
-      setOpen(true);
       setStatus("unauthenticated");
       return;
     }
 
-    setOpen(true);
     setStatus("scraping");
     setError(undefined);
 
@@ -82,14 +84,26 @@ export default function TiktokOverlay() {
       const scrapedAt = new Date().toISOString();
       const pageUrl = window.location.href;
 
+      const pageType = await new Promise<TokopediaPageType>((resolve) => {
+        requestIdleCallback(() => resolve(detectTokopediaPageType()), { timeout: 3000 });
+      });
+      setDetectedPageType(pageType);
+      console.log("[Mote LAB] Tokopedia page type:", pageType);
+
+      if (pageType === "unknown") {
+        setStatus("error");
+        setError("Halaman ini tidak didukung. Buka halaman search, toko, atau produk Tokopedia.");
+        return;
+      }
+
       if (pageType === "product-list") {
-        const products = await new Promise<ReturnType<typeof scrapeTiktokProductList>>((resolve) => {
-          requestIdleCallback(() => resolve(scrapeTiktokProductList()), { timeout: 3000 });
+        const products = await new Promise<ReturnType<typeof scrapeTokopediaProductList>>((resolve) => {
+          requestIdleCallback(() => resolve(scrapeTokopediaProductList()), { timeout: 3000 });
         });
 
         if (products.length === 0) {
           setStatus("error");
-          setError("Tidak ada produk ditemukan di halaman ini");
+          setError("Tidak ada produk ditemukan. Scraper Tokopedia masih dalam pengembangan.");
           return;
         }
 
@@ -99,7 +113,7 @@ export default function TiktokOverlay() {
         const batch = products.slice(0, 50);
         const res = await new Promise<{ ok: boolean; queued?: number }>((resolve) =>
           chrome.runtime.sendMessage(
-            { type: "INGEST_TIKTOK_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: batch } },
+            { type: "INGEST_TOKOPEDIA_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: batch } },
             resolve,
           ),
         );
@@ -112,13 +126,13 @@ export default function TiktokOverlay() {
           setError("Gagal mengirim data");
         }
       } else if (pageType === "product-detail") {
-        const product = await new Promise<ReturnType<typeof scrapeTiktokProductDetail>>((resolve) => {
-          requestIdleCallback(() => resolve(scrapeTiktokProductDetail()), { timeout: 3000 });
+        const product = await new Promise<ReturnType<typeof scrapeTokopediaProductDetail>>((resolve) => {
+          requestIdleCallback(() => resolve(scrapeTokopediaProductDetail()), { timeout: 3000 });
         });
 
         if (!product) {
           setStatus("error");
-          setError("Tidak bisa mengambil detail produk");
+          setError("Scraper detail produk Tokopedia masih dalam pengembangan.");
           return;
         }
 
@@ -127,10 +141,7 @@ export default function TiktokOverlay() {
 
         const res = await new Promise<{ ok: boolean }>((resolve) =>
           chrome.runtime.sendMessage(
-            {
-              type: "INGEST_TIKTOK_PRODUCTS",
-              payload: { scraped_at: scrapedAt, page_url: pageUrl, data: [product] },
-            },
+            { type: "INGEST_TOKOPEDIA_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: [product] } },
             resolve,
           ),
         );
@@ -138,13 +149,13 @@ export default function TiktokOverlay() {
         setStatus(res.ok ? "done" : "error");
         if (!res.ok) setError("Gagal mengirim data");
       } else if (pageType === "shop") {
-        const shop = await new Promise<ReturnType<typeof scrapeTiktokShop>>((resolve) => {
-          requestIdleCallback(() => resolve(scrapeTiktokShop()), { timeout: 3000 });
+        const shop = await new Promise<ReturnType<typeof scrapeTokopediaShop>>((resolve) => {
+          requestIdleCallback(() => resolve(scrapeTokopediaShop()), { timeout: 3000 });
         });
 
         if (!shop) {
           setStatus("error");
-          setError("Tidak bisa mengambil data toko");
+          setError("Scraper toko Tokopedia masih dalam pengembangan.");
           return;
         }
 
@@ -153,16 +164,13 @@ export default function TiktokOverlay() {
 
         const res = await new Promise<{ ok: boolean }>((resolve) =>
           chrome.runtime.sendMessage(
-            { type: "INGEST_TIKTOK_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
+            { type: "INGEST_TOKOPEDIA_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
             resolve,
           ),
         );
 
         setStatus(res.ok ? "done" : "error");
         if (!res.ok) setError("Gagal mengirim data toko");
-      } else {
-        setStatus("error");
-        setError("Halaman ini tidak didukung. Coba di halaman produk atau toko TikTok.");
       }
 
       chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => {
@@ -175,26 +183,27 @@ export default function TiktokOverlay() {
     }
   }
 
+  const handleOpenPanel = () => {
+    setOpen(true);
+    handleScrape();
+  };
+
   const statusForPanel: Status = !authenticated ? "unauthenticated" : status;
 
   return (
     <>
-      <FAB onClick={() => (open ? setOpen(false) : handleScrape())} active={open} queued={queueLen} />
+      <FAB
+        onClick={() => (open ? setOpen(false) : handleOpenPanel())}
+        active={open}
+        queued={queueLen}
+      />
       <SidePanel
         open={open}
         onClose={() => setOpen(false)}
         status={statusForPanel}
         itemCount={itemCount}
-        pageType={
-          pageType === "product-list"
-            ? "List Produk"
-            : pageType === "product-detail"
-              ? "Detail Produk"
-              : pageType === "shop"
-                ? "Toko"
-                : "Tidak Dikenali"
-        }
-        marketplace="TikTok Shop"
+        pageType={PAGE_TYPE_LABEL[detectedPageType]}
+        marketplace="Tokopedia"
         quota={quota}
         error={error}
         onScrape={handleScrape}

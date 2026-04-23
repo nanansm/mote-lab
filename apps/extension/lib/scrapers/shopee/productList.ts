@@ -1,3 +1,4 @@
+import { detectShopeePageType } from "./detect";
 import type { ShopeeProduct } from "../../types";
 
 interface NextDataItem {
@@ -68,94 +69,110 @@ function parseSoldCount(text: string): number {
   return isNaN(num) ? 0 : num;
 }
 
-function parseFromDOM(): ShopeeProduct[] {
-  const cards = document.querySelectorAll<HTMLElement>('[data-sqe="item"]');
-  console.log("[Shopee Scraper] Found", cards.length, "product cards");
+function parseProductCard(item: Element): ShopeeProduct | null {
+  try {
+    const link = item.querySelector<HTMLAnchorElement>('a[href*="-i."]');
+    if (!link) return null;
 
-  const results: ShopeeProduct[] = [];
+    const href = link.getAttribute("href") || "";
+    const idMatch = href.match(/-i\.(\d+)\.(\d+)/);
+    if (!idMatch) return null;
+    const [, shopId, productId] = idMatch;
 
-  cards.forEach((card, idx) => {
-    try {
-      const link = card.querySelector<HTMLAnchorElement>('a[href*="-i."]');
-      if (!link) return;
+    const url = new URL(href, "https://shopee.co.id").toString();
 
-      const href = link.getAttribute("href") || "";
-      const idMatch = href.match(/-i\.(\d+)\.(\d+)/);
-      if (!idMatch) return;
-      const [, shopId, productId] = idMatch;
+    const ariaLabel = link.getAttribute("aria-label") || "";
+    const img = item.querySelector("img");
+    const imgAlt = img?.getAttribute("alt") || "";
+    const imageUrl = img?.getAttribute("src") || img?.srcset?.split(" ")[0] || "";
 
-      const url = new URL(href, "https://shopee.co.id").toString();
+    const text = (item as HTMLElement).innerText || "";
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
 
-      const ariaLabel = link.getAttribute("aria-label") || "";
-      const img = card.querySelector("img");
-      const imgAlt = img?.getAttribute("alt") || "";
-      const imageUrl = img?.getAttribute("src") || img?.srcset?.split(" ")[0] || "";
+    const name = ariaLabel.replace(/^View product:\s*/i, "").trim()
+      || imgAlt.trim()
+      || lines[0]
+      || "";
+    if (!name) return null;
 
-      const text = card.innerText || "";
-      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-
-      // Name: aria-label > img alt > first text line
-      const name = ariaLabel.replace(/^View product:\s*/i, "").trim()
-        || imgAlt.trim()
-        || lines[0]
-        || "";
-      if (!name) return;
-
-      // Price: look for "Rp" line
-      let currentPrice = 0;
-      const rpIdx = lines.findIndex((l) => l === "Rp" || l.startsWith("Rp"));
-      if (rpIdx >= 0) {
-        const priceStr = lines[rpIdx] === "Rp" ? lines[rpIdx + 1] : lines[rpIdx].replace("Rp", "").trim();
-        currentPrice = parseInt(priceStr.replace(/\./g, ""), 10) || 0;
-      }
-
-      // Discount: "-XX%"
-      const discountLine = lines.find((l) => /^-\d+%$/.test(l));
-      const discountPercent = discountLine ? parseInt(discountLine.replace(/[-%]/g, ""), 10) : 0;
-
-      const originalPrice = discountPercent > 0
-        ? Math.round(currentPrice / (1 - discountPercent / 100))
-        : currentPrice;
-
-      // Rating: single decimal like "4.9"
-      const rating = parseFloat(lines.find((l) => /^\d\.\d$/.test(l)) ?? "") || null;
-
-      // Sold count
-      const soldLine = lines.find((l) => l.includes("Terjual"));
-      const totalSold = parseSoldCount(soldLine || "");
-
-      // Location: city/kab/kota keywords
-      const locationLine = lines.find((l) =>
-        /^(Kab\.|Kota|Jakarta|Tangerang|Bandung|Surabaya|Medan|Semarang|Yogyakarta|Bali|Bekasi|Depok|Bogor)/i.test(l)
-      ) || "";
-
-      results.push({
-        external_id: productId,
-        name,
-        url,
-        current_price: currentPrice,
-        original_price: originalPrice,
-        total_sold: totalSold,
-        rating: rating ?? undefined,
-        shop_id: shopId,
-        image_url: imageUrl,
-        location: locationLine,
-      });
-    } catch (err) {
-      console.error("[Shopee Scraper] Error parsing item", idx, err);
+    let currentPrice = 0;
+    const rpIdx = lines.findIndex((l) => l === "Rp" || l.startsWith("Rp"));
+    if (rpIdx >= 0) {
+      const priceStr = lines[rpIdx] === "Rp" ? lines[rpIdx + 1] : lines[rpIdx].replace("Rp", "").trim();
+      currentPrice = parseInt((priceStr ?? "").replace(/\./g, ""), 10) || 0;
     }
+
+    const discountLine = lines.find((l) => /^-\d+%$/.test(l));
+    const discountPercent = discountLine ? parseInt(discountLine.replace(/[-%]/g, ""), 10) : 0;
+    const originalPrice = discountPercent > 0
+      ? Math.round(currentPrice / (1 - discountPercent / 100))
+      : currentPrice;
+
+    const rating = parseFloat(lines.find((l) => /^\d\.\d$/.test(l)) ?? "") || null;
+
+    const soldLine = lines.find((l) => /terjual/i.test(l));
+    const totalSold = parseSoldCount(soldLine || "");
+
+    const locationLine = lines.find((l) =>
+      /^(Kab\.|Kota|Jakarta|Tangerang|Bandung|Surabaya|Medan|Semarang|Yogyakarta|Bali|Bekasi|Depok|Bogor|Luar Negeri|Overseas)/i.test(l)
+    ) || "";
+
+    return {
+      external_id: productId,
+      name,
+      url,
+      current_price: currentPrice,
+      original_price: originalPrice,
+      total_sold: totalSold,
+      rating: rating ?? undefined,
+      shop_id: shopId,
+      image_url: imageUrl,
+      location: locationLine,
+    };
+  } catch (err) {
+    console.error("[Shopee Scraper] Error parsing card:", err);
+    return null;
+  }
+}
+
+function scrapeSearchPage(): ShopeeProduct[] {
+  const cards = document.querySelectorAll<HTMLElement>('[data-sqe="item"]');
+  console.log("[Shopee Scraper] Search page: found", cards.length, "cards");
+  return Array.from(cards).map(parseProductCard).filter((p): p is ShopeeProduct => p !== null);
+}
+
+function scrapeShopPage(): ShopeeProduct[] {
+  // Collect unique parent containers for each product link
+  const links = document.querySelectorAll<HTMLAnchorElement>('a[href*="-i."]');
+  const cardsSet = new Set<Element>();
+
+  links.forEach((link) => {
+    const card =
+      link.closest("li") ||
+      link.closest('div[class*="duration-100"]') ||
+      link.closest('[role="group"]') ||
+      link.parentElement?.parentElement;
+    if (card) cardsSet.add(card);
   });
 
-  console.log("[Shopee Scraper] Parsed", results.length, "products from DOM");
-  return results;
+  console.log("[Shopee Scraper] Shop page: found", cardsSet.size, "unique cards");
+  return Array.from(cardsSet).map(parseProductCard).filter((p): p is ShopeeProduct => p !== null);
 }
 
 export function scrapeShopeeProductList(): ShopeeProduct[] {
+  // Try __NEXT_DATA__ first (fastest and most reliable)
   const fromNextData = parseFromNextData();
   if (fromNextData.length > 0) {
     console.log("[Shopee Scraper] Using __NEXT_DATA__, found", fromNextData.length, "products");
     return fromNextData;
   }
-  console.log("[Shopee Scraper] __NEXT_DATA__ empty, falling back to DOM");
-  return parseFromDOM();
+
+  const pageType = detectShopeePageType();
+  console.log("[Shopee Scraper] Falling back to DOM, page type:", pageType);
+
+  if (pageType === "product-list") return scrapeSearchPage();
+  if (pageType === "shop") return scrapeShopPage();
+
+  console.log("[Shopee Scraper] Page type not supported for list scraping");
+  return [];
 }

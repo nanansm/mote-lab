@@ -21,7 +21,7 @@ const steps = [
   {
     step: 3,
     title: "Mulai Riset",
-    description: "Buka shopee.co.id atau tiktok.com/shop dan mulai riset!",
+    description: "Buka shopee.co.id atau tokopedia.com/shop dan mulai riset!",
     done: false,
   },
 ];
@@ -74,7 +74,7 @@ export default function OnboardingPage() {
             </div>
           </div>
           <p className="text-sm text-slate-600 leading-relaxed">
-            Extension ini akan aktif secara otomatis saat kamu buka Shopee atau TikTok Shop.
+            Extension ini akan aktif secara otomatis saat kamu buka Shopee atau Tokopedia.
             Data dikumpulkan saat browsing natural — tidak ada auto-click atau notifikasi
             mengganggu.
           </p>

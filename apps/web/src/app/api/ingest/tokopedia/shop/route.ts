@@ -1,13 +1,12 @@
 import { NextRequest } from "next/server";
-import { tiktokProductsIngestSchema } from "@mote-lab/shared";
+import { tokopediaShopIngestSchema } from "@mote-lab/shared";
 import { createIngestHandler } from "@/lib/ingest-route-handler";
-import type { TiktokProductsIngest } from "@mote-lab/shared";
 
 const handler = createIngestHandler({
-  marketplace: "tiktok",
-  dataType: "products",
-  schema: tiktokProductsIngestSchema,
-  quotaIncrement: (body) => (body as TiktokProductsIngest).data.length,
+  marketplace: "tokopedia",
+  dataType: "shop",
+  schema: tokopediaShopIngestSchema,
+  quotaIncrement: () => 1,
 });
 
 export async function POST(request: NextRequest) { return handler(request); }

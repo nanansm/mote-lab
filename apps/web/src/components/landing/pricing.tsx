@@ -15,7 +15,7 @@ const plans = [
     features: [
       "Akses semua fitur selama 7 hari",
       "100 riset produk/hari",
-      "Shopee & TikTok Shop",
+      "Shopee & Tokopedia",
       "Bookmark unlimited",
       "Dashboard basic",
     ],

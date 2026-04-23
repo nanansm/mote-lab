@@ -2,7 +2,7 @@
   "name": "mote-lab-extension",
   "displayName": "Mote LAB - Marketplace Research",
   "version": "1.0.0",
-  "description": "Riset produk Shopee & TikTok Shop otomatis untuk Mote LAB",
+  "description": "Riset produk Shopee & Tokopedia otomatis untuk Mote LAB",
   "private": true,
   "scripts": {
     "dev": "plasmo dev",
@@ -26,11 +26,12 @@
   },
   "manifest": {
     "name": "Mote LAB - Marketplace Research",
-    "description": "Riset produk Shopee & TikTok Shop secara otomatis",
+    "description": "Riset produk Shopee & Tokopedia secara otomatis",
     "permissions": ["storage", "activeTab", "alarms"],
     "host_permissions": [
       "https://shopee.co.id/*",
-      "https://*.tiktok.com/*",
+      "https://www.tokopedia.com/*",
+      "https://tokopedia.com/*",
       "https://lab.motekreatif.com/*",
       "http://localhost:3003/*"
     ]

@@ -31,7 +31,7 @@ export interface ShopeeShop {
   is_official?: boolean;
 }
 
-export interface TiktokProduct {
+export interface TokopediaProduct {
   external_id: string;
   name: string;
   url: string;
@@ -48,7 +48,7 @@ export interface TiktokProduct {
   location?: string;
 }
 
-export interface TiktokShop {
+export interface TokopediaShop {
   external_id: string;
   name: string;
   username?: string;

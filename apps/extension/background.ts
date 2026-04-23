@@ -1,8 +1,8 @@
 import {
   ingestShopeeProducts,
   ingestShopeeShop,
-  ingestTiktokProducts,
-  ingestTiktokShop,
+  ingestTokopediaProducts,
+  ingestTokopediaShop,
   verifyToken,
 } from "./lib/api";
 import { dequeue, enqueue, queueLength, requeueWithBackoff } from "./lib/queue";
@@ -14,8 +14,8 @@ import type {
   ShopeeShop,
   ShopIngestPayload,
   StoredAuth,
-  TiktokProduct,
-  TiktokShop,
+  TokopediaProduct,
+  TokopediaShop,
 } from "./lib/types";
 
 export {};
@@ -27,7 +27,7 @@ const PUSH_THROTTLE_MS = 2000;
 async function getToken(): Promise<string | null> {
   const auth = await getAuth();
   if (!auth) return null;
-  // Expire after 30 days of inactivity or if resetAt passed
+  // Expire after 30 days of inactivity
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   if (Date.now() - auth.savedAt > thirtyDays) {
     await clearAuth();
@@ -39,8 +39,8 @@ async function getToken(): Promise<string | null> {
 type IngestMessage =
   | { type: "INGEST_SHOPEE_PRODUCTS"; payload: ProductsIngestPayload<ShopeeProduct> }
   | { type: "INGEST_SHOPEE_SHOP"; payload: ShopIngestPayload<ShopeeShop> }
-  | { type: "INGEST_TIKTOK_PRODUCTS"; payload: ProductsIngestPayload<TiktokProduct> }
-  | { type: "INGEST_TIKTOK_SHOP"; payload: ShopIngestPayload<TiktokShop> };
+  | { type: "INGEST_TOKOPEDIA_PRODUCTS"; payload: ProductsIngestPayload<TokopediaProduct> }
+  | { type: "INGEST_TOKOPEDIA_SHOP"; payload: ShopIngestPayload<TokopediaShop> };
 
 type ExtMessage =
   | IngestMessage
@@ -55,17 +55,16 @@ async function doIngest(token: string, msg: IngestMessage): Promise<IngestRespon
       return ingestShopeeProducts(token, msg.payload);
     case "INGEST_SHOPEE_SHOP":
       return ingestShopeeShop(token, msg.payload);
-    case "INGEST_TIKTOK_PRODUCTS":
-      return ingestTiktokProducts(token, msg.payload);
-    case "INGEST_TIKTOK_SHOP":
-      return ingestTiktokShop(token, msg.payload);
+    case "INGEST_TOKOPEDIA_PRODUCTS":
+      return ingestTokopediaProducts(token, msg.payload);
+    case "INGEST_TOKOPEDIA_SHOP":
+      return ingestTokopediaShop(token, msg.payload);
   }
 }
 
 async function handleIngest(msg: IngestMessage): Promise<{ ok: boolean; queued?: number; offline?: boolean }> {
   const now = Date.now();
   if (now - lastPushAt < PUSH_THROTTLE_MS) {
-    // Throttled — queue it
     await enqueue(msg.type, msg.payload);
     return { ok: true, offline: true };
   }
@@ -80,7 +79,6 @@ async function handleIngest(msg: IngestMessage): Promise<{ ok: boolean; queued?:
     lastPushAt = now;
     const res = await doIngest(token, msg);
     if (res.ok) {
-      // Update quota in storage
       const auth = await getAuth();
       if (auth && res.quotaRemaining !== undefined) {
         const used = auth.quota.limit - res.quotaRemaining;
@@ -124,7 +122,6 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
   (async () => {
     switch (message.type) {
       case "MOTE_LAB_AUTH_TOKEN": {
-        // Verify before storing
         try {
           const verify = await verifyToken(message.token);
           if (verify.valid) {
@@ -161,7 +158,6 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
             sendResponse({ authenticated: false });
           }
         } catch {
-          // Offline — return cached
           sendResponse({ authenticated: true, user: auth.user, quota: auth.quota, cached: true });
         }
         break;
@@ -181,13 +177,13 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
 
       case "INGEST_SHOPEE_PRODUCTS":
       case "INGEST_SHOPEE_SHOP":
-      case "INGEST_TIKTOK_PRODUCTS":
-      case "INGEST_TIKTOK_SHOP": {
+      case "INGEST_TOKOPEDIA_PRODUCTS":
+      case "INGEST_TOKOPEDIA_SHOP": {
         const result = await handleIngest(message);
         sendResponse(result);
         break;
       }
     }
   })();
-  return true; // keep channel open for async response
+  return true;
 });

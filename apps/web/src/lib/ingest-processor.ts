@@ -1,10 +1,10 @@
 import { randomUUID } from "crypto";
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@mote-lab/db";
-import type { ShopeeProductsIngest, ShopeeShopIngest, TiktokProductsIngest, TiktokShopIngest } from "@mote-lab/shared";
+import type { ShopeeProductsIngest, ShopeeShopIngest, TokopediaProductsIngest, TokopediaShopIngest } from "@mote-lab/shared";
 
 async function upsertProduct(
-  marketplace: "shopee" | "tiktok",
+  marketplace: "shopee" | "tokopedia",
   p: { external_id: string; name: string; url: string; current_price: number; original_price?: number; total_sold: number; rating?: number; review_count?: number; shop_id?: string; category_id?: string; category_name?: string; image_url?: string; location?: string },
 ) {
   const id = `${marketplace}_${p.external_id}`;
@@ -40,7 +40,6 @@ async function upsertProduct(
         rating: p.rating ?? null,
         reviewCount: p.review_count ?? null,
         lastSeenAt: now,
-        // Only update optional fields if new value is truthy
         ...(p.image_url && { imageUrl: p.image_url }),
         ...(p.location && { location: p.location }),
         ...(p.category_name && { categoryName: p.category_name }),
@@ -52,7 +51,6 @@ async function upsertProduct(
 
 async function upsertSnapshot(productId: string, price: number | null, soldCount: number | null, rating: number | null, reviewCount: number | null) {
   const now = new Date();
-  // WIB date
   const wibDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const snapshotDate = wibDate.toISOString().split("T")[0]!;
   const id = `${productId}_${snapshotDate}`;
@@ -115,20 +113,20 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
           set: { name: s.name, followerCount: s.follower_count ?? null, rating: s.rating ?? null, lastSeenAt: new Date() },
         });
         await insertResearch(item.userId, null, shopId, "shop_view");
-      } else if (item.marketplace === "tiktok" && item.dataType === "products") {
-        const payload = raw as unknown as TiktokProductsIngest;
+      } else if (item.marketplace === "tokopedia" && item.dataType === "products") {
+        const payload = raw as unknown as TokopediaProductsIngest;
         for (const p of payload.data) {
-          const productId = await upsertProduct("tiktok", p);
+          const productId = await upsertProduct("tokopedia", p);
           await upsertSnapshot(productId, p.current_price, p.total_sold, p.rating ?? null, p.review_count ?? null);
           await insertResearch(item.userId, productId, null, "product_view");
         }
-      } else if (item.marketplace === "tiktok" && item.dataType === "shop") {
-        const payload = raw as unknown as TiktokShopIngest;
+      } else if (item.marketplace === "tokopedia" && item.dataType === "shop") {
+        const payload = raw as unknown as TokopediaShopIngest;
         const s = payload.data;
-        const shopId = `tiktok_shop_${s.external_id}`;
+        const shopId = `tokopedia_shop_${s.external_id}`;
         await db.insert(schema.shops).values({
           id: shopId,
-          marketplace: "tiktok",
+          marketplace: "tokopedia",
           externalId: s.external_id,
           name: s.name,
           username: s.username ?? null,

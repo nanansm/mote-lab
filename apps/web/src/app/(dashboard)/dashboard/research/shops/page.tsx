@@ -50,7 +50,7 @@ export default async function ResearchShopsPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">Belum Ada Data Toko</h3>
             <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
-              Buka halaman toko di Shopee atau TikTok Shop saat extension aktif.
+              Buka halaman toko di Shopee atau Tokopedia saat extension aktif.
             </p>
             <Button asChild className="bg-[#1E40AF] hover:bg-[#1d4ed8]">
               <Link href="/dashboard/install-extension">Install Extension</Link>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { FAB } from "../components/overlay/FAB";
 import { SidePanel } from "../components/overlay/SidePanel";
 import { aggregateEstimate, type AggregateEstimate } from "../lib/estimate";
-import { detectShopeePageType } from "../lib/scrapers/shopee/detect";
+import { detectShopeePageType, type ShopeePageType } from "../lib/scrapers/shopee/detect";
 import { scrapeShopeeProductDetail } from "../lib/scrapers/shopee/productDetail";
 import { scrapeShopeeProductList } from "../lib/scrapers/shopee/productList";
 import { scrapeShopeeShop } from "../lib/scrapers/shopee/shop";
@@ -44,6 +44,13 @@ export const getRootContainer = async () => {
 
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
+const PAGE_TYPE_LABEL: Record<ShopeePageType, string> = {
+  "product-list": "List Produk",
+  "product-detail": "Detail Produk",
+  "shop": "Toko",
+  "unknown": "Tidak Didukung",
+};
+
 export default function ShopeeOverlay() {
   console.log("[Mote LAB] ShopeeOverlay rendered");
   const [open, setOpen] = useState(false);
@@ -55,8 +62,7 @@ export default function ShopeeOverlay() {
   const [authenticated, setAuthenticated] = useState(true);
   const [products, setProducts] = useState<ShopeeProduct[]>([]);
   const [estimate, setEstimate] = useState<AggregateEstimate | undefined>();
-
-  const pageType = detectShopeePageType(window.location.href);
+  const [detectedPageType, setDetectedPageType] = useState<ShopeePageType>("unknown");
 
   useEffect(() => {
     console.log("[Mote LAB] Shopee content script aktif:", window.location.href);
@@ -84,7 +90,20 @@ export default function ShopeeOverlay() {
       const scrapedAt = new Date().toISOString();
       const pageUrl = window.location.href;
 
-      if (pageType === "product-list") {
+      // Detect page type with DOM inside requestIdleCallback so Shopee's React has time to render
+      const pageType = await new Promise<ShopeePageType>((resolve) => {
+        requestIdleCallback(() => resolve(detectShopeePageType()), { timeout: 3000 });
+      });
+      setDetectedPageType(pageType);
+      console.log("[Mote LAB] Detected page type:", pageType);
+
+      if (pageType === "unknown") {
+        setStatus("error");
+        setError("Halaman ini tidak didukung. Buka halaman search, toko, atau produk Shopee.");
+        return;
+      }
+
+      if (pageType === "product-list" || pageType === "shop") {
         const scraped = await new Promise<ReturnType<typeof scrapeShopeeProductList>>((resolve) => {
           requestIdleCallback(() => resolve(scrapeShopeeProductList()), { timeout: 3000 });
         });
@@ -111,6 +130,16 @@ export default function ShopeeOverlay() {
         if (res.ok) {
           setStatus("done");
           if (quota) setQuota((q) => q && { ...q, used: q.used + (res.queued ?? batch.length) });
+          // Also push shop metadata when on a shop page
+          if (pageType === "shop") {
+            const shop = scrapeShopeeShop();
+            if (shop) {
+              chrome.runtime.sendMessage({
+                type: "INGEST_SHOPEE_SHOP",
+                payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop },
+              });
+            }
+          }
         } else {
           setStatus("error");
           setError("Gagal mengirim data");
@@ -138,29 +167,6 @@ export default function ShopeeOverlay() {
 
         setStatus(res.ok ? "done" : "error");
         if (!res.ok) setError("Gagal mengirim data");
-      } else if (pageType === "shop") {
-        const shop = await new Promise<ReturnType<typeof scrapeShopeeShop>>((resolve) => {
-          requestIdleCallback(() => resolve(scrapeShopeeShop()), { timeout: 3000 });
-        });
-
-        if (!shop) {
-          setStatus("error");
-          setError("Tidak bisa mengambil data toko");
-          return;
-        }
-
-        setItemCount(1);
-        setStatus("sending");
-
-        const res = await new Promise<{ ok: boolean }>((resolve) =>
-          chrome.runtime.sendMessage(
-            { type: "INGEST_SHOPEE_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
-            resolve,
-          ),
-        );
-
-        setStatus(res.ok ? "done" : "error");
-        if (!res.ok) setError("Gagal mengirim data toko");
       }
 
       chrome.runtime.sendMessage({ type: "GET_QUEUE_LENGTH" }, (res) => {
@@ -194,15 +200,7 @@ export default function ShopeeOverlay() {
         onClose={() => setOpen(false)}
         status={statusForPanel}
         itemCount={itemCount}
-        pageType={
-          pageType === "product-list"
-            ? "List Produk"
-            : pageType === "product-detail"
-              ? "Detail Produk"
-              : pageType === "shop"
-                ? "Toko"
-                : "Tidak Dikenali"
-        }
+        pageType={PAGE_TYPE_LABEL[detectedPageType]}
         marketplace="Shopee"
         quota={quota}
         error={error}

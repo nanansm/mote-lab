@@ -26,7 +26,7 @@ const features = [
     icon: BarChart2Icon,
     title: "Cross-Marketplace Insight",
     description:
-      "Bandingkan performa produk yang sama di Shopee vs TikTok Shop. Temukan arbitrase harga dan peluang.",
+      "Bandingkan performa produk yang sama di Shopee vs Tokopedia. Temukan arbitrase harga dan peluang.",
     badge: "Pro",
   },
   {

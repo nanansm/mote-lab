@@ -99,7 +99,7 @@ export function Footer() {
         </div>
 
         <p className="mt-6 text-xs text-slate-600 text-center leading-relaxed">
-          Shopee, TikTok, Tokopedia, dan Lazada adalah merek dagang dari pemiliknya
+          Shopee, Tokopedia, Tokopedia, dan Lazada adalah merek dagang dari pemiliknya
           masing-masing. Mote LAB tidak berafiliasi dengan platform tersebut. Mote LAB adalah
           browser helper tool yang membantu pengguna melihat informasi yang sudah publicly
           available di marketplace.

@@ -14,12 +14,12 @@ const faqs = [
   {
     question: "Bagaimana cara kerja hybrid architecture-nya?",
     answer:
-      "Extension Chrome di browser kamu membaca data produk dari halaman Shopee/TikTok Shop yang kamu buka secara natural. Data tersebut dikirim ke server kami dan digabung (aggregate) dengan data dari user lain. Hasilnya: collective intelligence yang jauh lebih kaya dari apa yang bisa kamu kumpulkan sendiri.",
+      "Extension Chrome di browser kamu membaca data produk dari halaman Shopee/Tokopedia yang kamu buka secara natural. Data tersebut dikirim ke server kami dan digabung (aggregate) dengan data dari user lain. Hasilnya: collective intelligence yang jauh lebih kaya dari apa yang bisa kamu kumpulkan sendiri.",
   },
   {
     question: "Data marketplace apa saja yang tersedia?",
     answer:
-      "Saat ini Phase 1 mencakup Shopee Indonesia (shopee.co.id) dan TikTok Shop Indonesia. Data yang dikumpulkan: nama produk, harga, jumlah terjual, rating, info toko, kategori, dan lokasi seller. Tokopedia dan Lazada dijadwalkan di Phase berikutnya.",
+      "Saat ini Phase 1 mencakup Shopee Indonesia (shopee.co.id) dan Tokopedia Indonesia. Data yang dikumpulkan: nama produk, harga, jumlah terjual, rating, info toko, kategori, dan lokasi seller. Tokopedia dan Lazada dijadwalkan di Phase berikutnya.",
   },
   {
     question: "Apakah extension perlu izin/permission khusus?",

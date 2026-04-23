@@ -20,7 +20,7 @@ export function HeroSection() {
         <div className="max-w-4xl mx-auto text-center">
           <Badge className="mb-6 bg-orange-500/20 text-orange-300 border-orange-400/30 hover:bg-orange-500/20">
             <TrendingUpIcon className="size-3" />
-            Shopee + TikTok Shop Indonesia
+            Shopee + Tokopedia Indonesia
           </Badge>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight mb-6">
@@ -66,7 +66,7 @@ export function HeroSection() {
           {/* Stats */}
           <div className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
             {[
-              { value: "2 Platform", label: "Shopee & TikTok Shop" },
+              { value: "2 Platform", label: "Shopee & Tokopedia" },
               { value: "Real-time", label: "Data Terkini" },
               { value: "100+", label: "Riset/hari (Trial)" },
             ].map((stat) => (

@@ -163,7 +163,7 @@ export const products = pgTable(
   "products",
   {
     id: text("id").primaryKey(), // e.g. 'shopee_123456789'
-    marketplace: text("marketplace").notNull(), // 'shopee' | 'tiktok'
+    marketplace: text("marketplace").notNull(), // 'shopee' | 'tokopedia'
     externalId: text("external_id").notNull(),
     name: text("name").notNull(),
     slug: text("slug"),
@@ -281,7 +281,7 @@ export const ingestQueue = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    marketplace: text("marketplace").notNull(), // 'shopee' | 'tiktok'
+    marketplace: text("marketplace").notNull(), // 'shopee' | 'tokopedia'
     dataType: text("data_type").notNull(), // 'products' | 'shop'
     rawData: jsonb("raw_data").$type<Record<string, unknown>>().notNull(),
     status: text("status").notNull().default("pending"), // 'pending' | 'processed' | 'error'

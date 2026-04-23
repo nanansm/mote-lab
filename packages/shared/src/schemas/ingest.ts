@@ -44,9 +44,9 @@ export const shopeeShopIngestSchema = z.object({
   data: shopeeShopSchema,
 });
 
-// ── TikTok Shop ─────────────────────────────────────────────────────────────
+// ── Tokopedia ────────────────────────────────────────────────────────────────
 
-export const tiktokProductSchema = z.object({
+export const tokopediaProductSchema = z.object({
   external_id: z.string().min(1),
   name: z.string().min(1),
   url: z.string().url(),
@@ -63,7 +63,7 @@ export const tiktokProductSchema = z.object({
   location: z.string().optional(),
 });
 
-export const tiktokShopSchema = z.object({
+export const tokopediaShopSchema = z.object({
   external_id: z.string().min(1),
   name: z.string().min(1),
   username: z.string().optional(),
@@ -76,16 +76,16 @@ export const tiktokShopSchema = z.object({
   is_official: z.boolean().optional(),
 });
 
-export const tiktokProductsIngestSchema = z.object({
+export const tokopediaProductsIngestSchema = z.object({
   scraped_at: z.string().datetime(),
   page_url: z.string().url(),
-  data: z.array(tiktokProductSchema).min(1).max(100),
+  data: z.array(tokopediaProductSchema).min(1).max(100),
 });
 
-export const tiktokShopIngestSchema = z.object({
+export const tokopediaShopIngestSchema = z.object({
   scraped_at: z.string().datetime(),
   page_url: z.string().url(),
-  data: tiktokShopSchema,
+  data: tokopediaShopSchema,
 });
 
 // ── Inferred types ──────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ export type ShopeeShop = z.infer<typeof shopeeShopSchema>;
 export type ShopeeProductsIngest = z.infer<typeof shopeeProductsIngestSchema>;
 export type ShopeeShopIngest = z.infer<typeof shopeeShopIngestSchema>;
 
-export type TiktokProduct = z.infer<typeof tiktokProductSchema>;
-export type TiktokShop = z.infer<typeof tiktokShopSchema>;
-export type TiktokProductsIngest = z.infer<typeof tiktokProductsIngestSchema>;
-export type TiktokShopIngest = z.infer<typeof tiktokShopIngestSchema>;
+export type TokopediaProduct = z.infer<typeof tokopediaProductSchema>;
+export type TokopediaShop = z.infer<typeof tokopediaShopSchema>;
+export type TokopediaProductsIngest = z.infer<typeof tokopediaProductsIngestSchema>;
+export type TokopediaShopIngest = z.infer<typeof tokopediaShopIngestSchema>;

@@ -152,7 +152,7 @@ export default async function DashboardPage() {
             </h3>
             <p className="text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
               Extension Chrome Mote LAB akan otomatis mengumpulkan data produk saat kamu browse
-              Shopee atau TikTok Shop.
+              Shopee atau Tokopedia.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button asChild className="gap-2 bg-[#1E40AF] hover:bg-[#1d4ed8]">

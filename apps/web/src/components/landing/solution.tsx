@@ -11,7 +11,7 @@ const steps = [
     icon: UsersIcon,
     title: "Browse & Auto-collect",
     description:
-      "Saat kamu browse Shopee/TikTok Shop, extension otomatis collect data produk yang kamu lihat.",
+      "Saat kamu browse Shopee/Tokopedia, extension otomatis collect data produk yang kamu lihat.",
     color: "bg-orange-100 text-orange-600",
   },
   {
@@ -27,7 +27,7 @@ const advantages = [
   "Tidak butuh server scraping mahal",
   "Data fresh karena real-time dari browser user",
   "Tidak bisa diblokir marketplace",
-  "Cross-marketplace insights (Shopee + TikTok Shop)",
+  "Cross-marketplace insights (Shopee + Tokopedia)",
 ];
 
 export function SolutionSection() {

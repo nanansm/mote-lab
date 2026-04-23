@@ -15,8 +15,8 @@ export const metadata: Metadata = {
     template: "%s | Mote LAB",
   },
   description:
-    "Tool riset produk marketplace berbasis data. Analisis Shopee & TikTok Shop dengan collective intelligence dari ribuan seller.",
-  keywords: ["riset produk", "marketplace", "shopee", "tiktok shop", "seller", "analisis data"],
+    "Tool riset produk marketplace berbasis data. Analisis Shopee & Tokopedia dengan collective intelligence dari ribuan seller.",
+  keywords: ["riset produk", "marketplace", "shopee", "tokopedia shop", "seller", "analisis data"],
   authors: [{ name: "Mote Kreatif" }],
   creator: "Mote Kreatif",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3003"),
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     url: process.env.NEXT_PUBLIC_APP_URL,
     title: "Mote LAB — Marketplace Research Tool",
     description:
-      "Tool riset produk marketplace berbasis data. Analisis Shopee & TikTok Shop.",
+      "Tool riset produk marketplace berbasis data. Analisis Shopee & Tokopedia.",
     siteName: "Mote LAB",
   },
   twitter: {

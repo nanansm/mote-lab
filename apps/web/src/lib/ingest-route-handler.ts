@@ -20,7 +20,7 @@ async function rateLimit(userId: string): Promise<boolean> {
 }
 
 type IngestHandlerOptions = {
-  marketplace: "shopee" | "tiktok";
+  marketplace: "shopee" | "tokopedia";
   dataType: "products" | "shop";
   schema: z.ZodTypeAny;
   quotaIncrement: (body: unknown) => number;

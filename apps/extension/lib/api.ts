@@ -4,8 +4,8 @@ import type {
   ShopeeProduct,
   ShopeeShop,
   ShopIngestPayload,
-  TiktokProduct,
-  TiktokShop,
+  TokopediaProduct,
+  TokopediaShop,
   VerifyResponse,
 } from "./types";
 
@@ -72,11 +72,11 @@ export async function ingestShopeeShop(
   return res.json() as Promise<IngestResponse>;
 }
 
-export async function ingestTiktokProducts(
+export async function ingestTokopediaProducts(
   token: string,
-  payload: ProductsIngestPayload<TiktokProduct>,
+  payload: ProductsIngestPayload<TokopediaProduct>,
 ): Promise<IngestResponse> {
-  const res = await fetchWithRetry(`${API_URL}/api/ingest/tiktok/products`, {
+  const res = await fetchWithRetry(`${API_URL}/api/ingest/tokopedia/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -84,11 +84,11 @@ export async function ingestTiktokProducts(
   return res.json() as Promise<IngestResponse>;
 }
 
-export async function ingestTiktokShop(
+export async function ingestTokopediaShop(
   token: string,
-  payload: ShopIngestPayload<TiktokShop>,
+  payload: ShopIngestPayload<TokopediaShop>,
 ): Promise<IngestResponse> {
-  const res = await fetchWithRetry(`${API_URL}/api/ingest/tiktok/shop`, {
+  const res = await fetchWithRetry(`${API_URL}/api/ingest/tokopedia/shop`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),

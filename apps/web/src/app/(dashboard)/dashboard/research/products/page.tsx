@@ -68,7 +68,7 @@ export default async function ResearchProductsPage({
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Riset Produk</h1>
           <p className="text-slate-600 mt-1 text-sm">
-            Analisis performa produk dari Shopee & TikTok Shop.
+            Analisis performa produk dari Shopee & Tokopedia.
           </p>
         </div>
         <Card className="border-dashed border-2 border-slate-200">
@@ -78,7 +78,7 @@ export default async function ResearchProductsPage({
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">Belum Ada Data Produk</h3>
             <p className="text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
-              Install extension Mote LAB, lalu buka Shopee atau TikTok Shop.
+              Install extension Mote LAB, lalu buka Shopee atau Tokopedia.
             </p>
             <Button asChild className="bg-[#1E40AF] hover:bg-[#1d4ed8]">
               <Link href="/dashboard/install-extension">Install Extension</Link>
@@ -100,7 +100,7 @@ export default async function ResearchProductsPage({
         </div>
         {/* Marketplace filter */}
         <div className="flex gap-2">
-          {["", "shopee", "tiktok"].map((mkt) => (
+          {["", "shopee", "tokopedia"].map((mkt) => (
             <Button
               key={mkt}
               asChild
@@ -113,7 +113,7 @@ export default async function ResearchProductsPage({
               }
             >
               <Link href={`/dashboard/research/products${mkt ? `?marketplace=${mkt}` : ""}`}>
-                {mkt === "" ? "Semua" : mkt === "shopee" ? "Shopee" : "TikTok"}
+                {mkt === "" ? "Semua" : mkt === "shopee" ? "Shopee" : "Tokopedia"}
               </Link>
             </Button>
           ))}

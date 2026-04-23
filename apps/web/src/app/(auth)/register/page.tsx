@@ -10,7 +10,7 @@ import { signIn } from "@/lib/auth-client";
 
 const trialFeatures = [
   "Akses semua fitur selama 7 hari",
-  "Shopee & TikTok Shop",
+  "Shopee & Tokopedia",
   "100 riset produk/hari",
   "Tidak perlu kartu kredit",
 ];
