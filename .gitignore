@@ -38,8 +38,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# drizzle generated (keep migrations, skip meta)
-packages/db/drizzle/meta
 
 # docker
 *.dockerignore
