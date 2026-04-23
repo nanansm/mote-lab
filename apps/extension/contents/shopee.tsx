@@ -2,10 +2,12 @@ import type { PlasmoCSConfig } from "plasmo";
 import { useEffect, useState } from "react";
 import { FAB } from "../components/overlay/FAB";
 import { SidePanel } from "../components/overlay/SidePanel";
+import { aggregateEstimate, type AggregateEstimate } from "../lib/estimate";
 import { detectShopeePageType } from "../lib/scrapers/shopee/detect";
 import { scrapeShopeeProductDetail } from "../lib/scrapers/shopee/productDetail";
 import { scrapeShopeeProductList } from "../lib/scrapers/shopee/productList";
 import { scrapeShopeeShop } from "../lib/scrapers/shopee/shop";
+import type { ShopeeProduct } from "../lib/types";
 
 export const config: PlasmoCSConfig = {
   matches: ["https://shopee.co.id/*"],
@@ -51,6 +53,8 @@ export default function ShopeeOverlay() {
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number } | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [authenticated, setAuthenticated] = useState(true);
+  const [products, setProducts] = useState<ShopeeProduct[]>([]);
+  const [estimate, setEstimate] = useState<AggregateEstimate | undefined>();
 
   const pageType = detectShopeePageType(window.location.href);
 
@@ -69,12 +73,10 @@ export default function ShopeeOverlay() {
 
   async function handleScrape() {
     if (!authenticated) {
-      setOpen(true);
       setStatus("unauthenticated");
       return;
     }
 
-    setOpen(true);
     setStatus("scraping");
     setError(undefined);
 
@@ -83,20 +85,22 @@ export default function ShopeeOverlay() {
       const pageUrl = window.location.href;
 
       if (pageType === "product-list") {
-        const products = await new Promise<ReturnType<typeof scrapeShopeeProductList>>((resolve) => {
+        const scraped = await new Promise<ReturnType<typeof scrapeShopeeProductList>>((resolve) => {
           requestIdleCallback(() => resolve(scrapeShopeeProductList()), { timeout: 3000 });
         });
 
-        if (products.length === 0) {
+        if (scraped.length === 0) {
           setStatus("error");
           setError("Tidak ada produk ditemukan di halaman ini");
           return;
         }
 
-        setItemCount(products.length);
+        setProducts(scraped);
+        setEstimate(aggregateEstimate(scraped));
+        setItemCount(scraped.length);
         setStatus("sending");
 
-        const batch = products.slice(0, 50);
+        const batch = scraped.slice(0, 50);
         const res = await new Promise<{ ok: boolean; queued?: number; offline?: boolean }>((resolve) =>
           chrome.runtime.sendMessage(
             { type: "INGEST_SHOPEE_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: batch } },
@@ -169,11 +173,22 @@ export default function ShopeeOverlay() {
     }
   }
 
+  const handleOpenPanel = () => {
+    setOpen(true);
+    if (products.length === 0) {
+      handleScrape();
+    }
+  };
+
   const statusForPanel: Status = !authenticated ? "unauthenticated" : status;
 
   return (
     <>
-      <FAB onClick={() => (open ? setOpen(false) : handleScrape())} active={open} queued={queueLen} />
+      <FAB
+        onClick={() => (open ? setOpen(false) : handleOpenPanel())}
+        active={open}
+        queued={queueLen}
+      />
       <SidePanel
         open={open}
         onClose={() => setOpen(false)}
@@ -192,6 +207,8 @@ export default function ShopeeOverlay() {
         quota={quota}
         error={error}
         onScrape={handleScrape}
+        estimate={estimate}
+        products={products}
       />
     </>
   );

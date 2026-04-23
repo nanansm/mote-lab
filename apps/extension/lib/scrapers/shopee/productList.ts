@@ -50,39 +50,112 @@ function parseFromNextData(): ShopeeProduct[] {
   }
 }
 
+function parseSoldCount(text: string): number {
+  if (!text) return 0;
+  const cleaned = text.replace(/Terjual/i, "").trim();
+
+  if (/RB/i.test(cleaned)) {
+    const num = parseFloat(cleaned.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1000);
+  }
+
+  if (/JT/i.test(cleaned)) {
+    const num = parseFloat(cleaned.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1_000_000);
+  }
+
+  const num = parseInt(cleaned.replace(/[^\d]/g, ""), 10);
+  return isNaN(num) ? 0 : num;
+}
+
 function parseFromDOM(): ShopeeProduct[] {
   const cards = document.querySelectorAll<HTMLElement>('[data-sqe="item"]');
+  console.log("[Shopee Scraper] Found", cards.length, "product cards");
+
   const results: ShopeeProduct[] = [];
 
-  cards.forEach((card) => {
-    const link = card.querySelector<HTMLAnchorElement>("a[href*='/product/']");
-    if (!link) return;
+  cards.forEach((card, idx) => {
+    try {
+      const link = card.querySelector<HTMLAnchorElement>('a[href*="-i."]');
+      if (!link) return;
 
-    const match = link.href.match(/\/product\/(\d+)\/(\d+)/);
-    if (!match) return;
-    const [, shopId, itemId] = match;
+      const href = link.getAttribute("href") || "";
+      const idMatch = href.match(/-i\.(\d+)\.(\d+)/);
+      if (!idMatch) return;
+      const [, shopId, productId] = idMatch;
 
-    const name = card.querySelector('[data-sqe="name"]')?.textContent?.trim() ?? "";
-    const priceText = card.querySelector('[data-sqe="price"]')?.textContent?.replace(/[^0-9]/g, "") ?? "0";
-    const soldText = card.querySelector('[data-sqe="sold"]')?.textContent ?? "0";
-    const soldNum = parseInt(soldText.replace(/[^0-9]/g, "") || "0", 10);
+      const url = new URL(href, "https://shopee.co.id").toString();
 
-    if (!name) return;
-    results.push({
-      external_id: itemId,
-      name,
-      url: `https://shopee.co.id/product/${shopId}/${itemId}`,
-      current_price: parseInt(priceText, 10),
-      total_sold: soldNum,
-      shop_id: shopId,
-    });
+      const ariaLabel = link.getAttribute("aria-label") || "";
+      const img = card.querySelector("img");
+      const imgAlt = img?.getAttribute("alt") || "";
+      const imageUrl = img?.getAttribute("src") || img?.srcset?.split(" ")[0] || "";
+
+      const text = card.innerText || "";
+      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+      // Name: aria-label > img alt > first text line
+      const name = ariaLabel.replace(/^View product:\s*/i, "").trim()
+        || imgAlt.trim()
+        || lines[0]
+        || "";
+      if (!name) return;
+
+      // Price: look for "Rp" line
+      let currentPrice = 0;
+      const rpIdx = lines.findIndex((l) => l === "Rp" || l.startsWith("Rp"));
+      if (rpIdx >= 0) {
+        const priceStr = lines[rpIdx] === "Rp" ? lines[rpIdx + 1] : lines[rpIdx].replace("Rp", "").trim();
+        currentPrice = parseInt(priceStr.replace(/\./g, ""), 10) || 0;
+      }
+
+      // Discount: "-XX%"
+      const discountLine = lines.find((l) => /^-\d+%$/.test(l));
+      const discountPercent = discountLine ? parseInt(discountLine.replace(/[-%]/g, ""), 10) : 0;
+
+      const originalPrice = discountPercent > 0
+        ? Math.round(currentPrice / (1 - discountPercent / 100))
+        : currentPrice;
+
+      // Rating: single decimal like "4.9"
+      const rating = parseFloat(lines.find((l) => /^\d\.\d$/.test(l)) ?? "") || null;
+
+      // Sold count
+      const soldLine = lines.find((l) => l.includes("Terjual"));
+      const totalSold = parseSoldCount(soldLine || "");
+
+      // Location: city/kab/kota keywords
+      const locationLine = lines.find((l) =>
+        /^(Kab\.|Kota|Jakarta|Tangerang|Bandung|Surabaya|Medan|Semarang|Yogyakarta|Bali|Bekasi|Depok|Bogor)/i.test(l)
+      ) || "";
+
+      results.push({
+        external_id: productId,
+        name,
+        url,
+        current_price: currentPrice,
+        original_price: originalPrice,
+        total_sold: totalSold,
+        rating: rating ?? undefined,
+        shop_id: shopId,
+        image_url: imageUrl,
+        location: locationLine,
+      });
+    } catch (err) {
+      console.error("[Shopee Scraper] Error parsing item", idx, err);
+    }
   });
 
+  console.log("[Shopee Scraper] Parsed", results.length, "products from DOM");
   return results;
 }
 
 export function scrapeShopeeProductList(): ShopeeProduct[] {
   const fromNextData = parseFromNextData();
-  if (fromNextData.length > 0) return fromNextData;
+  if (fromNextData.length > 0) {
+    console.log("[Shopee Scraper] Using __NEXT_DATA__, found", fromNextData.length, "products");
+    return fromNextData;
+  }
+  console.log("[Shopee Scraper] __NEXT_DATA__ empty, falling back to DOM");
   return parseFromDOM();
 }

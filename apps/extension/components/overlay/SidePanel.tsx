@@ -1,4 +1,13 @@
+import { formatIDR, type AggregateEstimate } from "../../lib/estimate";
 import { QuotaBar } from "./QuotaBar";
+
+type ProductRow = {
+  external_id: string;
+  name: string;
+  current_price: number;
+  total_sold: number;
+  rating?: number | null;
+};
 
 interface SidePanelProps {
   open: boolean;
@@ -10,6 +19,8 @@ interface SidePanelProps {
   quota?: { used: number; limit: number; remaining: number };
   error?: string;
   onScrape?: () => void;
+  estimate?: AggregateEstimate;
+  products?: ProductRow[];
 }
 
 const STATUS_LABEL: Record<SidePanelProps["status"], string> = {
@@ -40,6 +51,8 @@ export function SidePanel({
   quota,
   error,
   onScrape,
+  estimate,
+  products,
 }: SidePanelProps) {
   if (!open) return null;
 
@@ -156,6 +169,49 @@ export function SidePanel({
               <QuotaBar used={quota.used} limit={quota.limit} className="px-1" />
             )}
 
+            {/* Estimasi Market */}
+            {estimate && estimate.productCount > 0 && (
+              <div
+                style={{
+                  padding: "16px",
+                  background: "#f0f4ff",
+                  borderRadius: "8px",
+                  border: "1px solid #c7d7f9",
+                }}
+              >
+                <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "12px", color: "#1E40AF" }}>
+                  Estimasi Market
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "2px" }}>Total Omset</div>
+                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>
+                      {formatIDR(estimate.totalOmset)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "2px" }}>Omset / Bulan</div>
+                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>
+                      {formatIDR(estimate.monthlyOmset)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "2px" }}>Rata-rata / Produk</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                      {formatIDR(estimate.avgMonthlyPerProduct)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "2px" }}>Jumlah Produk</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{estimate.productCount}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: "8px", fontSize: "10px", color: "#9ca3af" }}>
+                  *Estimasi berdasarkan total terjual × harga, asumsi 6 bulan aktif
+                </div>
+              </div>
+            )}
+
             {/* Action button */}
             {(status === "idle" || status === "done" || status === "error") && onScrape && (
               <button
@@ -172,7 +228,7 @@ export function SidePanel({
                   fontSize: "14px",
                 }}
               >
-                {status === "done" ? "Ambil Ulang" : "Ambil Data Sekarang"}
+                Refresh Data
               </button>
             )}
 
@@ -191,6 +247,35 @@ export function SidePanel({
                   }}
                 />
                 <p>{STATUS_LABEL[status]}</p>
+              </div>
+            )}
+
+            {/* Product list */}
+            {products && products.length > 0 && (
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", marginBottom: "8px" }}>
+                  {products.length} produk di halaman ini:
+                </div>
+                <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                  {products.slice(0, 20).map((p) => (
+                    <div
+                      key={p.external_id}
+                      style={{
+                        padding: "8px 4px",
+                        borderBottom: "1px solid #f3f4f6",
+                        fontSize: "12px",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: "2px", color: "#111827" }}>
+                        {p.name.length > 60 ? `${p.name.slice(0, 60)}...` : p.name}
+                      </div>
+                      <div style={{ color: "#6b7280" }}>
+                        {formatIDR(p.current_price)} · {p.total_sold.toLocaleString("id")} terjual
+                        {p.rating ? ` · ⭐ ${p.rating}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
