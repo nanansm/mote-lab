@@ -93,6 +93,7 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
         const payload = raw as unknown as ShopeeShopIngest;
         const s = payload.data;
         const shopId = `shopee_shop_${s.external_id}`;
+        console.log("[Shop Ingest] shopee", s.external_id, { follower_count: s.follower_count, total_products: s.total_products });
         await db.insert(schema.shops).values({
           id: shopId,
           marketplace: "shopee",
@@ -110,7 +111,16 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
           lastSeenAt: new Date(),
         }).onConflictDoUpdate({
           target: [schema.shops.marketplace, schema.shops.externalId],
-          set: { name: s.name, followerCount: s.follower_count ?? null, rating: s.rating ?? null, lastSeenAt: new Date() },
+          set: {
+            name: s.name,
+            username: s.username ?? null,
+            followerCount: s.follower_count ?? null,
+            rating: s.rating ?? null,
+            totalProducts: s.total_products ?? null,
+            location: s.location ?? null,
+            isOfficial: s.is_official ?? false,
+            lastSeenAt: new Date(),
+          },
         });
         await insertResearch(item.userId, null, shopId, "shop_view");
       } else if (item.marketplace === "tokopedia" && item.dataType === "products") {
@@ -124,6 +134,7 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
         const payload = raw as unknown as TokopediaShopIngest;
         const s = payload.data;
         const shopId = `tokopedia_shop_${s.external_id}`;
+        console.log("[Shop Ingest] tokopedia", s.external_id, { follower_count: s.follower_count, total_products: s.total_products });
         await db.insert(schema.shops).values({
           id: shopId,
           marketplace: "tokopedia",
@@ -141,7 +152,16 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
           lastSeenAt: new Date(),
         }).onConflictDoUpdate({
           target: [schema.shops.marketplace, schema.shops.externalId],
-          set: { name: s.name, followerCount: s.follower_count ?? null, rating: s.rating ?? null, lastSeenAt: new Date() },
+          set: {
+            name: s.name,
+            username: s.username ?? null,
+            followerCount: s.follower_count ?? null,
+            rating: s.rating ?? null,
+            totalProducts: s.total_products ?? null,
+            location: s.location ?? null,
+            isOfficial: s.is_official ?? false,
+            lastSeenAt: new Date(),
+          },
         });
         await insertResearch(item.userId, null, shopId, "shop_view");
       }

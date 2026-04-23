@@ -69,6 +69,12 @@ export function scrapeShopeeShop(): ShopeeShop | null {
     return null;
   }
 
+  // Prefer numeric shopId so products.shopId (from -i.{shopId}.{productId} URLs) matches
+  // shops.externalId on the dashboard join. Fall back to username when no product links exist.
+  const productLink = document.querySelector<HTMLAnchorElement>('a[href*="-i."]');
+  const numericShopId = productLink?.href?.match(/-i\.(\d+)\./)?.[1];
+  const external_id = numericShopId ?? username;
+
   const shopName =
     document.title.split("|")[0].replace(/^Toko Online\s*/i, "").trim() ||
     username;
@@ -94,10 +100,10 @@ export function scrapeShopeeShop(): ShopeeShop | null {
       document.querySelector('[class*="mall"]') !== null);
 
   console.log("[Shopee Shop] Raw labels:", { produk: produkRaw, pengikut: pengikutRaw, penilaian: penilaianRaw });
-  console.log("[Shopee Shop] Parsed:", { username, name: shopName, follower_count, total_products, rating, is_official });
+  console.log("[Shopee Shop] Parsed:", { external_id, username, name: shopName, follower_count, total_products, rating, is_official });
 
   return {
-    external_id: username,
+    external_id,
     name: shopName,
     username,
     url: `https://shopee.co.id/${username}`,

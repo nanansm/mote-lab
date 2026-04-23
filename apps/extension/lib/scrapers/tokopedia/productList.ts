@@ -90,9 +90,16 @@ function scrapeProductCard(el: Element): TokopediaProduct | null {
   const shop_name = shopLocParts.length > 1 ? shopLocParts[0] : undefined;
   const location = shopLocParts.length > 1 ? shopLocParts[1] : shopLocParts[0] || undefined;
 
-  // External ID from URL
+  // Extract shop username from URL /{shop}/{product-slug} — used as shop_id for the DB join
   const url = rawUrl.split("?")[0];
-  const shopUsername = shop_name?.toLowerCase().replace(/\s+/g, "-") ?? "";
+  let shop_id: string | undefined;
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    if (segments.length >= 1) shop_id = segments[0];
+  } catch {
+    // ignore
+  }
+  const shopUsername = shop_id ?? "";
   const external_id = extractExternalId(url, shopUsername);
 
   return {
@@ -102,6 +109,7 @@ function scrapeProductCard(el: Element): TokopediaProduct | null {
     current_price,
     total_sold,
     rating: rating && !isNaN(rating) ? rating : undefined,
+    shop_id,
     shop_name,
     location,
   };
