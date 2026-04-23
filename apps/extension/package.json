@@ -27,7 +27,7 @@
   "manifest": {
     "name": "Mote LAB - Marketplace Research",
     "description": "Riset produk Shopee & TikTok Shop secara otomatis",
-    "permissions": ["storage", "activeTab"],
+    "permissions": ["storage", "activeTab", "alarms"],
     "host_permissions": [
       "https://shopee.co.id/*",
       "https://*.tiktok.com/*",

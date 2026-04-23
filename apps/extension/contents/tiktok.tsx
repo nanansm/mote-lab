@@ -9,10 +9,8 @@ import { scrapeTiktokProductList } from "../lib/scrapers/tiktok/productList";
 import { scrapeTiktokShop } from "../lib/scrapers/tiktok/shop";
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://*.tiktok.com/*", "https://shop.tiktok.com/*"],
+  matches: ["https://*.tiktok.com/*"],
   run_at: "document_idle",
-  // world: "MAIN" allows access to window globals like __INITIAL_STATE__
-  world: "MAIN",
 };
 
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";

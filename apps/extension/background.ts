@@ -191,10 +191,3 @@ chrome.runtime.onMessage.addListener((message: ExtMessage, _sender, sendResponse
   })();
   return true; // keep channel open for async response
 });
-
-// Listen for auth token posted from the extension auth page
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url?.includes("/auth/extension")) {
-    chrome.tabs.sendMessage(tabId, { type: "EXTENSION_PAGE_READY" }).catch(() => {});
-  }
-});
