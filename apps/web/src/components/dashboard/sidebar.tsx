@@ -47,7 +47,7 @@ const navItems = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
 
   const isActive = (href: string, exact?: boolean) => {
@@ -56,7 +56,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 border-r bg-white min-h-screen">
+    <aside className={cn("flex flex-col w-64 border-r bg-white min-h-screen", className)}>
       <div className="flex items-center gap-2 h-16 px-5 border-b font-bold text-lg">
         <ZapIcon className="size-5 text-orange-500" />
         <span className="text-[#1E40AF]">Mote LAB</span>

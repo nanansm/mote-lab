@@ -8,8 +8,10 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   const reqHeaders = await headers();
   const session = await auth.api.getSession({ headers: reqHeaders });
 
+  const cookieHeader = reqHeaders.get("cookie") ?? "";
+  const cookieNames = cookieHeader.split(";").map((c) => c.trim().split("=")[0]).filter(Boolean);
   console.log("[owner-layout] session:", session ? `userId=${session.user.id}` : "null");
-  console.log("[owner-layout] cookie header:", reqHeaders.get("cookie"));
+  console.log("[owner-layout] cookie_names:", cookieNames);
 
   if (!session) {
     console.log("[owner-layout] no session → redirect /");

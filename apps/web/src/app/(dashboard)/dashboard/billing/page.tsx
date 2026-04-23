@@ -54,7 +54,7 @@ export default function BillingPage() {
   const { data: session } = useSession();
 
   function handleUpgrade(plan: Plan) {
-    toast.info(`Integrasi Xendit untuk plan ${PLAN_LABELS[plan]} akan hadir di Phase 2.`, {
+    toast.info(`Integrasi iPaymu untuk plan ${PLAN_LABELS[plan]} akan hadir di Phase 2.`, {
       description: "Saat ini pembayaran belum tersedia. Pantau update kami.",
       duration: 5000,
     });
@@ -145,7 +145,7 @@ export default function BillingPage() {
         </div>
 
         <p className="text-xs text-slate-500 text-center mt-4">
-          Pembayaran via Xendit (VA, e-wallet, QRIS, kartu kredit). Tersedia di Phase 2.
+          Pembayaran via iPaymu (VA, e-wallet, QRIS). Tersedia di Phase 2.
         </p>
       </div>
 

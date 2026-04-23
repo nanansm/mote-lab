@@ -168,7 +168,7 @@ DATABASE_URL=... OWNER_EMAIL=... node scripts/seed-owner.mjs
 
 - **Phase 0** ✅ — Web app, auth, dashboard skeleton, owner panel
 - **Phase 1** — Chrome extension (Plasmo), Shopee & TikTok Shop scraping
-- **Phase 2** — Payment integration (Xendit), email notifications
+- **Phase 2** — Payment integration (iPaymu), email notifications
 - **Phase 3** — Advanced analytics, competitor tracking
 - **Phase 4** — Background workers, trending computation
 - **Phase 5** — Tokopedia & Lazada support

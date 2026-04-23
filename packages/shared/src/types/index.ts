@@ -22,7 +22,7 @@ export interface Subscription {
   status: SubscriptionStatus;
   trialEndsAt: Date | null;
   currentPeriodEnd: Date | null;
-  xenditInvoiceId: string | null;
+  ipaymuInvoiceId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

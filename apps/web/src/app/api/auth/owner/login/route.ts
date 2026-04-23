@@ -119,8 +119,7 @@ export async function POST(request: NextRequest) {
       ? "__Secure-better-auth.session_token"
       : "better-auth.session_token";
 
-    console.log("[owner-login] session created for:", ownerUser.id);
-    console.log("[owner-login] cookie_name:", cookieName, "secure:", useSecurePrefix);
+    console.log("[owner-login] session created for:", ownerUser.id, "| cookie:", cookieName, "secure:", useSecurePrefix);
 
     const response = NextResponse.json({ success: true });
     response.cookies.set({

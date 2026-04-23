@@ -71,7 +71,7 @@ export const subscriptions = pgTable("subscriptions", {
   status: text("status").notNull().default("active"), // 'active' | 'expired' | 'cancelled'
   trialEndsAt: timestamp("trial_ends_at"),
   currentPeriodEnd: timestamp("current_period_end"),
-  xenditInvoiceId: text("xendit_invoice_id"),
+  ipaymuInvoiceId: text("ipaymu_invoice_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
