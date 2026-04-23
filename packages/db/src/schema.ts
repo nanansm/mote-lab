@@ -6,6 +6,9 @@ import {
   integer,
   date,
   unique,
+  real,
+  jsonb,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -133,3 +136,210 @@ export type Account = typeof accounts.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type NewSubscription = typeof subscriptions.$inferInsert;
 export type UsageQuota = typeof usageQuota.$inferSelect;
+
+// ==================== PHASE 1 TABLES ====================
+
+// Extension auth tokens (long-lived, stored in chrome.storage)
+export const extensionTokens = pgTable(
+  "extension_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(), // SHA-256 hex hash of the raw token
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => [
+    index("extension_tokens_user_idx").on(table.userId),
+    index("extension_tokens_token_idx").on(table.token),
+  ],
+);
+
+// Marketplace products
+export const products = pgTable(
+  "products",
+  {
+    id: text("id").primaryKey(), // e.g. 'shopee_123456789'
+    marketplace: text("marketplace").notNull(), // 'shopee' | 'tiktok'
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    slug: text("slug"),
+    url: text("url").notNull(),
+    shopId: text("shop_id"),
+    categoryId: text("category_id"),
+    categoryName: text("category_name"),
+    imageUrl: text("image_url"),
+    currentPrice: integer("current_price"),
+    originalPrice: integer("original_price"),
+    totalSold: integer("total_sold"),
+    rating: real("rating"),
+    reviewCount: integer("review_count"),
+    location: text("location"),
+    firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("products_marketplace_external_id_uq").on(table.marketplace, table.externalId),
+    index("products_marketplace_sold_idx").on(table.marketplace, table.totalSold),
+    index("products_category_idx").on(table.categoryId),
+    index("products_shop_idx").on(table.shopId),
+  ],
+);
+
+// Marketplace shops
+export const shops = pgTable(
+  "shops",
+  {
+    id: text("id").primaryKey(), // e.g. 'shopee_shop_789'
+    marketplace: text("marketplace").notNull(),
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    username: text("username"),
+    url: text("url").notNull(),
+    followerCount: integer("follower_count"),
+    rating: real("rating"),
+    totalProducts: integer("total_products"),
+    joinedDate: text("joined_date"),
+    location: text("location"),
+    isOfficial: boolean("is_official").default(false),
+    firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("shops_marketplace_external_id_uq").on(table.marketplace, table.externalId),
+    index("shops_marketplace_idx").on(table.marketplace),
+  ],
+);
+
+// Daily product price/sold snapshots for history charts
+// NOTE: Created as a partitioned table by the SQL migration — Drizzle handles queries, not DDL.
+export const productSnapshots = pgTable(
+  "product_snapshots",
+  {
+    id: text("id").primaryKey(), // '{productId}_{date}'
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    snapshotDate: date("snapshot_date").notNull(),
+    price: integer("price"),
+    soldCount: integer("sold_count"),
+    rating: real("rating"),
+    reviewCount: integer("review_count"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("snapshots_product_date_uq").on(table.productId, table.snapshotDate),
+    index("snapshots_product_date_idx").on(table.productId, table.snapshotDate),
+  ],
+);
+
+// Research activity log per user
+export const userResearch = pgTable(
+  "user_research",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    productId: text("product_id"),
+    shopId: text("shop_id"),
+    researchType: text("research_type").notNull(), // 'product_view' | 'shop_view' | 'search'
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("user_research_user_created_idx").on(table.userId, table.createdAt),
+  ],
+);
+
+// User-saved products and shops
+export const savedItems = pgTable(
+  "saved_items",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemType: text("item_type").notNull(), // 'product' | 'shop'
+    itemId: text("item_id").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("saved_items_user_type_item_uq").on(table.userId, table.itemType, table.itemId),
+  ],
+);
+
+// Raw scrape queue for background processing
+export const ingestQueue = pgTable(
+  "ingest_queue",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    marketplace: text("marketplace").notNull(), // 'shopee' | 'tiktok'
+    dataType: text("data_type").notNull(), // 'products' | 'shop'
+    rawData: jsonb("raw_data").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull().default("pending"), // 'pending' | 'processed' | 'error'
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    processedAt: timestamp("processed_at"),
+  },
+  (table) => [
+    index("ingest_queue_status_created_idx").on(table.status, table.createdAt),
+    index("ingest_queue_user_idx").on(table.userId),
+  ],
+);
+
+// ==================== PHASE 1 RELATIONS ====================
+
+export const extensionTokensRelations = relations(extensionTokens, ({ one }) => ({
+  user: one(users, { fields: [extensionTokens.userId], references: [users.id] }),
+}));
+
+export const productsRelations = relations(products, ({ many }) => ({
+  snapshots: many(productSnapshots),
+  savedBy: many(savedItems),
+}));
+
+export const shopsRelations = relations(shops, ({ many }) => ({
+  savedBy: many(savedItems),
+}));
+
+export const productSnapshotsRelations = relations(productSnapshots, ({ one }) => ({
+  product: one(products, { fields: [productSnapshots.productId], references: [products.id] }),
+}));
+
+export const userResearchRelations = relations(userResearch, ({ one }) => ({
+  user: one(users, { fields: [userResearch.userId], references: [users.id] }),
+}));
+
+export const savedItemsRelations = relations(savedItems, ({ one }) => ({
+  user: one(users, { fields: [savedItems.userId], references: [users.id] }),
+}));
+
+export const ingestQueueRelations = relations(ingestQueue, ({ one }) => ({
+  user: one(users, { fields: [ingestQueue.userId], references: [users.id] }),
+}));
+
+// Update existing usersRelations to include new tables
+// (Drizzle merges relations defined separately — no need to modify original)
+
+// ==================== PHASE 1 TYPES ====================
+
+export type ExtensionToken = typeof extensionTokens.$inferSelect;
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;
+export type Shop = typeof shops.$inferSelect;
+export type NewShop = typeof shops.$inferInsert;
+export type ProductSnapshot = typeof productSnapshots.$inferSelect;
+export type NewProductSnapshot = typeof productSnapshots.$inferInsert;
+export type UserResearch = typeof userResearch.$inferSelect;
+export type NewUserResearch = typeof userResearch.$inferInsert;
+export type SavedItem = typeof savedItems.$inferSelect;
+export type IngestQueue = typeof ingestQueue.$inferSelect;
+export type NewIngestQueue = typeof ingestQueue.$inferInsert;

@@ -1,0 +1,38 @@
+{
+  "name": "mote-lab-extension",
+  "displayName": "Mote LAB - Marketplace Research",
+  "version": "1.0.0",
+  "description": "Riset produk Shopee & TikTok Shop otomatis untuk Mote LAB",
+  "private": true,
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build --zip",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "plasmo": "0.88.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@plasmohq/messaging": "^0.6.2",
+    "@types/chrome": "^0.0.287",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.7.2"
+  },
+  "manifest": {
+    "name": "Mote LAB - Marketplace Research",
+    "description": "Riset produk Shopee & TikTok Shop secara otomatis",
+    "permissions": ["storage", "activeTab"],
+    "host_permissions": [
+      "https://shopee.co.id/*",
+      "https://*.tiktok.com/*",
+      "https://lab.motekreatif.com/*",
+      "http://localhost:3003/*"
+    ]
+  }
+}

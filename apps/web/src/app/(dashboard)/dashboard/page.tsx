@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@mote-lab/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, count, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,8 @@ import {
   StoreIcon,
   BookmarkIcon,
   DownloadIcon,
-  ChromeIcon,
   ClockIcon,
+  PuzzleIcon,
 } from "lucide-react";
 import { formatDate, formatRelativeDate } from "@/lib/utils";
 import { PLAN_LABELS } from "@mote-lab/shared";
@@ -21,10 +21,46 @@ export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
 
-  const subscription = await db.query.subscriptions.findFirst({
-    where: eq(schema.subscriptions.userId, session.user.id),
-    orderBy: desc(schema.subscriptions.createdAt),
-  });
+  const userId = session.user.id;
+
+  // Parallel queries
+  const [subscription, productCount, shopCount, savedCount, recentResearch] =
+    await Promise.all([
+      db.query.subscriptions.findFirst({
+        where: eq(schema.subscriptions.userId, userId),
+        orderBy: [desc(schema.subscriptions.createdAt)],
+      }),
+      db
+        .select({ count: count() })
+        .from(schema.userResearch)
+        .where(
+          and(
+            eq(schema.userResearch.userId, userId),
+            eq(schema.userResearch.researchType, "product_view"),
+          ),
+        )
+        .then((r) => r[0]?.count ?? 0),
+      db
+        .select({ count: count() })
+        .from(schema.userResearch)
+        .where(
+          and(
+            eq(schema.userResearch.userId, userId),
+            eq(schema.userResearch.researchType, "shop_view"),
+          ),
+        )
+        .then((r) => r[0]?.count ?? 0),
+      db
+        .select({ count: count() })
+        .from(schema.savedItems)
+        .where(eq(schema.savedItems.userId, userId))
+        .then((r) => r[0]?.count ?? 0),
+      db.query.userResearch.findMany({
+        where: eq(schema.userResearch.userId, userId),
+        orderBy: [desc(schema.userResearch.createdAt)],
+        limit: 5,
+      }),
+    ]);
 
   const plan = subscription?.plan ?? "trial";
   const isTrialExpired =
@@ -33,9 +69,9 @@ export default async function DashboardPage() {
     new Date(subscription.trialEndsAt) < new Date();
 
   const quickStats = [
-    { label: "Riset Produk", value: "0", icon: SearchIcon, href: "/dashboard/research/products" },
-    { label: "Riset Toko", value: "0", icon: StoreIcon, href: "/dashboard/research/shops" },
-    { label: "Tersimpan", value: "0", icon: BookmarkIcon, href: "/dashboard/saved" },
+    { label: "Riset Produk", value: String(productCount), icon: SearchIcon, href: "/dashboard/research/products" },
+    { label: "Riset Toko", value: String(shopCount), icon: StoreIcon, href: "/dashboard/research/shops" },
+    { label: "Tersimpan", value: String(savedCount), icon: BookmarkIcon, href: "/dashboard/saved" },
   ];
 
   return (
@@ -78,7 +114,7 @@ export default async function DashboardPage() {
             </div>
           </div>
           <Badge className="bg-blue-100 text-blue-700 border-blue-200 shrink-0">
-            {PLAN_LABELS[plan]}
+            {PLAN_LABELS[plan as keyof typeof PLAN_LABELS]}
           </Badge>
         </div>
       )}
@@ -104,30 +140,64 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Empty state — extension not installed */}
-      <Card className="border-dashed border-2 border-slate-200 bg-white">
-        <CardContent className="py-12 text-center">
-          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <ChromeIcon className="size-8 text-slate-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">
-            Install Extension untuk Mulai Riset
-          </h3>
-          <p className="text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
-            Extension Chrome Mote LAB akan otomatis mengumpulkan data produk saat kamu browse
-            Shopee atau TikTok Shop. Data akan langsung muncul di sini.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button disabled className="gap-2">
-              <DownloadIcon className="size-4" />
-              Download Extension (Segera Hadir)
+      {/* Extension CTA or recent activity */}
+      {recentResearch.length === 0 ? (
+        <Card className="border-dashed border-2 border-slate-200 bg-white">
+          <CardContent className="py-10 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <PuzzleIcon className="size-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              Install Extension untuk Mulai Riset
+            </h3>
+            <p className="text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
+              Extension Chrome Mote LAB akan otomatis mengumpulkan data produk saat kamu browse
+              Shopee atau TikTok Shop.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button asChild className="gap-2 bg-[#1E40AF] hover:bg-[#1d4ed8]">
+                <Link href="/dashboard/install-extension">
+                  <DownloadIcon className="size-4" />
+                  Install Extension
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/billing">Lihat Plan</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Aktivitas Terakhir</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y">
+              {recentResearch.map((r) => (
+                <div key={r.id} className="py-2.5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {r.researchType === "product_view" ? (
+                      <SearchIcon className="size-4 text-slate-400 shrink-0" />
+                    ) : (
+                      <StoreIcon className="size-4 text-slate-400 shrink-0" />
+                    )}
+                    <span className="text-sm text-slate-700 truncate">
+                      {r.productId ?? r.shopId ?? "—"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0">
+                    {formatRelativeDate(r.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+              <Link href="/dashboard/research/products">Lihat Semua Riset</Link>
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/billing">Lihat Plan</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

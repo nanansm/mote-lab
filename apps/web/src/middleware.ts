@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
   const isAuthenticated = !!sessionCookie;
 
-  const protectedRoutes = ["/dashboard", "/onboarding"];
+  const protectedRoutes = ["/dashboard", "/onboarding", "/auth/extension"];
   const ownerRoutes = ["/owner"];
   const authRoutes = ["/login", "/register"];
 
@@ -48,5 +48,6 @@ export const config = {
     "/onboarding",
     "/login",
     "/register",
+    "/auth/extension",
   ],
 };
