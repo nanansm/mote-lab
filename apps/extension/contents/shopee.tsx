@@ -104,6 +104,24 @@ export default function ShopeeOverlay() {
       }
 
       if (pageType === "product-list" || pageType === "shop") {
+        // For shop pages: scrape and push shop info first (independently of products)
+        if (pageType === "shop") {
+          const shop = await new Promise<ReturnType<typeof scrapeShopeeShop>>((resolve) => {
+            requestIdleCallback(() => resolve(scrapeShopeeShop()), { timeout: 3000 });
+          });
+          if (shop) {
+            console.log("[Mote LAB] Pushing shop info:", shop.name, "| id:", shop.external_id);
+            await new Promise<void>((resolve) =>
+              chrome.runtime.sendMessage(
+                { type: "INGEST_SHOPEE_SHOP", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop } },
+                () => resolve(),
+              ),
+            );
+          } else {
+            console.warn("[Mote LAB] scrapeShopeeShop() returned null");
+          }
+        }
+
         const scraped = await new Promise<ReturnType<typeof scrapeShopeeProductList>>((resolve) => {
           requestIdleCallback(() => resolve(scrapeShopeeProductList()), { timeout: 3000 });
         });
@@ -130,16 +148,6 @@ export default function ShopeeOverlay() {
         if (res.ok) {
           setStatus("done");
           if (quota) setQuota((q) => q && { ...q, used: q.used + (res.queued ?? batch.length) });
-          // Also push shop metadata when on a shop page
-          if (pageType === "shop") {
-            const shop = scrapeShopeeShop();
-            if (shop) {
-              chrome.runtime.sendMessage({
-                type: "INGEST_SHOPEE_SHOP",
-                payload: { scraped_at: scrapedAt, page_url: pageUrl, data: shop },
-              });
-            }
-          }
         } else {
           setStatus("error");
           setError("Gagal mengirim data");
