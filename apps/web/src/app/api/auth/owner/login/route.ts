@@ -112,15 +112,23 @@ export async function POST(request: NextRequest) {
 
     await redis.del(key);
 
+    // Match better-auth's cookie naming: __Secure- prefix when BETTER_AUTH_URL is https or NODE_ENV=production
+    const authUrl = process.env.BETTER_AUTH_URL ?? "";
+    const useSecurePrefix = authUrl.startsWith("https://") || process.env.NODE_ENV === "production";
+    const cookieName = useSecurePrefix
+      ? "__Secure-better-auth.session_token"
+      : "better-auth.session_token";
+
     console.log("[owner-login] session created for:", ownerUser.id);
+    console.log("[owner-login] cookie_name:", cookieName, "secure:", useSecurePrefix);
 
     const response = NextResponse.json({ success: true });
     response.cookies.set({
-      name: "better-auth.session_token",
+      name: cookieName,
       value: cookieValue,
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecurePrefix,
       path: "/",
       maxAge: SESSION_TTL_SECONDS,
     });

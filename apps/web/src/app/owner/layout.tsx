@@ -5,14 +5,21 @@ import Link from "next/link";
 import { ZapIcon, LayoutDashboardIcon, UsersIcon, CreditCardIcon, ArrowLeftIcon } from "lucide-react";
 
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const reqHeaders = await headers();
+  const session = await auth.api.getSession({ headers: reqHeaders });
+
+  console.log("[owner-layout] session:", session ? `userId=${session.user.id}` : "null");
+  console.log("[owner-layout] cookie header:", reqHeaders.get("cookie"));
 
   if (!session) {
+    console.log("[owner-layout] no session → redirect /");
     redirect("/");
   }
 
   const role = (session.user as { role?: string }).role;
+  console.log("[owner-layout] role:", role);
   if (role !== "owner") {
+    console.log("[owner-layout] not owner → redirect /");
     redirect("/");
   }
 

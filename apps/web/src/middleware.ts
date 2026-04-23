@@ -14,9 +14,15 @@ export async function middleware(request: NextRequest) {
   const isOwnerRoute = ownerRoutes.some((r) => pathname.startsWith(r));
   const isAuthPage = authRoutes.some((r) => pathname === r);
 
+  if (isOwnerRoute) {
+    const allCookies = request.cookies.getAll().map((c) => c.name);
+    console.log("[middleware-owner] path:", pathname, "isAuthenticated:", isAuthenticated, "cookies:", allCookies);
+  }
+
   // /owner/* — requires session; role check is done in owner/layout.tsx (server component)
   // Non-owners are redirected to / (not /control-panel/login — don't leak the URL)
   if (isOwnerRoute && !isAuthenticated) {
+    console.log("[middleware-owner] no session → redirect /");
     return NextResponse.redirect(new URL("/", request.url));
   }
 
