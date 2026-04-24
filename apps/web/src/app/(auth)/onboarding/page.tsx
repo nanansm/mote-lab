@@ -78,16 +78,14 @@ export default function OnboardingPage() {
             Data dikumpulkan saat browsing natural — tidak ada auto-click atau notifikasi
             mengganggu.
           </p>
-          <Button
-            disabled
-            className="w-full"
-            title="Extension akan tersedia setelah Phase 1 selesai"
-          >
+        <Button asChild className="w-full">
+          <a href="/api/extension/download?download=1">
             <DownloadIcon className="size-4" />
-            Download Extension (Segera Hadir)
-          </Button>
+            Download Extension
+          </a>
+        </Button>
           <p className="text-xs text-center text-slate-400">
-            Extension sedang dalam pengembangan. Kamu akan diberitahu via email saat siap.
+            Unzip file, buka chrome://extensions, aktifkan Developer mode, klik "Load unpacked", pilih folder hasil unzip.
           </p>
         </CardContent>
       </Card>
