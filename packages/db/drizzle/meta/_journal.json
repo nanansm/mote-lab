@@ -26,8 +26,29 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1777004084757,
-      "tag": "0003_quiet_captain_america",
+      "when": 1745481700000,
+      "tag": "0003_replace_tiktok_with_tokopedia",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1745568000000,
+      "tag": "0004_add_shop_review_sold",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745654400000,
+      "tag": "0005_fix_numeric_bigint",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1745654500000,
+      "tag": "0006_billing_tables",
       "breakpoints": true
     }
   ]
