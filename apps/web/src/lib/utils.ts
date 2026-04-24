@@ -35,6 +35,36 @@ export function formatRelativeDate(date: Date | string): string {
   return `${Math.abs(diffDays)} hari lalu`;
 }
 
+// dd/MM/yyyy HH:mm WIB
+export function formatDateTimeWIB(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  return (
+    new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Jakarta",
+    }).format(new Date(date)) + " WIB"
+  );
+}
+
+export function formatDateTimeSecWIB(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  return (
+    new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Asia/Jakarta",
+    }).format(new Date(date)) + " WIB"
+  );
+}
+
 export function generateId(): string {
   return crypto.randomUUID();
 }

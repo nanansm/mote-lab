@@ -41,3 +41,7 @@ next-env.d.ts
 
 # docker
 *.dockerignore
+
+# Plasmo extension build cache
+apps/extension/.plasmo/
+apps/extension/build/

@@ -298,6 +298,55 @@ export const ingestQueue = pgTable(
   ],
 );
 
+// ==================== PHASE 2: BILLING ====================
+
+// Payment orders — one row per payment attempt
+export const orders = pgTable(
+  "orders",
+  {
+    id: text("id").primaryKey(), // our internal UUID, also sent to iPaymu as referenceId
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    plan: text("plan").notNull(), // 'starter' | 'pro' | 'lifetime'
+    amount: bigint("amount", { mode: "number" }).notNull(), // IDR, e.g. 99000
+    phone: text("phone").notNull(), // required by iPaymu
+    status: text("status").notNull().default("pending"), // 'pending' | 'paid' | 'failed' | 'expired'
+    paymentUrl: text("payment_url"), // redirect URL from iPaymu
+    ipaymuSessionId: text("ipaymu_session_id"), // Data.SessionID from iPaymu create-payment response
+    ipaymuTrxId: text("ipaymu_trx_id"), // trx_id from iPaymu webhook callback
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    paidAt: timestamp("paid_at"),
+  },
+  (table) => [
+    index("orders_user_idx").on(table.userId),
+    index("orders_status_created_idx").on(table.status, table.createdAt),
+    index("orders_ipaymu_session_idx").on(table.ipaymuSessionId),
+    index("orders_ipaymu_trx_idx").on(table.ipaymuTrxId),
+  ],
+);
+
+// Raw webhook log — ALL payloads logged before processing
+export const webhookLogs = pgTable(
+  "webhook_logs",
+  {
+    id: text("id").primaryKey(),
+    source: text("source").notNull().default("ipaymu"), // extensible
+    rawBody: text("raw_body").notNull(), // raw form-urlencoded string
+    parsedData: jsonb("parsed_data").$type<Record<string, unknown>>(),
+    trxId: text("trx_id"), // extracted trx_id for quick lookup
+    status: text("status").notNull().default("received"), // 'received' | 'processed' | 'error'
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    processedAt: timestamp("processed_at"),
+  },
+  (table) => [
+    index("webhook_logs_trx_idx").on(table.trxId),
+    index("webhook_logs_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
 // ==================== PHASE 1 RELATIONS ====================
 
 export const extensionTokensRelations = relations(extensionTokens, ({ one }) => ({
@@ -329,6 +378,10 @@ export const ingestQueueRelations = relations(ingestQueue, ({ one }) => ({
   user: one(users, { fields: [ingestQueue.userId], references: [users.id] }),
 }));
 
+export const ordersRelations = relations(orders, ({ one }) => ({
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+}));
+
 // Update existing usersRelations to include new tables
 // (Drizzle merges relations defined separately — no need to modify original)
 
@@ -346,3 +399,10 @@ export type NewUserResearch = typeof userResearch.$inferInsert;
 export type SavedItem = typeof savedItems.$inferSelect;
 export type IngestQueue = typeof ingestQueue.$inferSelect;
 export type NewIngestQueue = typeof ingestQueue.$inferInsert;
+
+// ==================== PHASE 2 TYPES ====================
+
+export type Order = typeof orders.$inferSelect;
+export type NewOrder = typeof orders.$inferInsert;
+export type WebhookLog = typeof webhookLogs.$inferSelect;
+export type NewWebhookLog = typeof webhookLogs.$inferInsert;

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
-import { ZapIcon, LayoutDashboardIcon, UsersIcon, CreditCardIcon, ArrowLeftIcon } from "lucide-react";
+import { ZapIcon, LayoutDashboardIcon, UsersIcon, CreditCardIcon, ArrowLeftIcon, ShoppingCartIcon, WebhookIcon } from "lucide-react";
 
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
   const reqHeaders = await headers();
@@ -38,6 +38,8 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
             { label: "Overview", href: "/owner", icon: LayoutDashboardIcon },
             { label: "Users", href: "/owner/users", icon: UsersIcon },
             { label: "Subscriptions", href: "/owner/subscriptions", icon: CreditCardIcon },
+            { label: "Orders", href: "/owner/orders", icon: ShoppingCartIcon },
+            { label: "Webhook Logs", href: "/owner/webhook-logs", icon: WebhookIcon },
           ].map((item) => (
             <Link
               key={item.href}
