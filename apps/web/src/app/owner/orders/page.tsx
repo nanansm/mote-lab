@@ -28,7 +28,7 @@ export default async function OwnerOrdersPage({ searchParams }: Props) {
 
   // ── Aggregate stats ───────────────────────────────────────────────────────────
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   const [statsRows, totalCount] = await Promise.all([
     db
