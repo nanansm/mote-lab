@@ -82,7 +82,10 @@ function parseCardText(card: HTMLElement, shopSlug: string, pageType: string): T
     ) ?? "";
 
   const img = card.querySelector<HTMLImageElement>("img");
-  const imageUrl = img?.src || img?.srcset?.split(" ")[0] || "";
+  // Only keep http/https URLs — Tokopedia uses data: URIs as lazy-load placeholders;
+  // those fail z.string().url() validation on the server and cause silent 422 drops.
+  const rawImg = img?.src || img?.srcset?.split(" ")[0] || "";
+  const imageUrl = rawImg.startsWith("http") ? rawImg : "";
 
   return {
     external_id: "",  // filled by caller after URL parsing

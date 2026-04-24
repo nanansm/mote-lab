@@ -41,20 +41,20 @@
     },
     {
       "matches": [
-        "https://shopee.co.id/*"
-      ],
-      "js": [
-        "static/contents/shopee.tsx"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
         "https://www.tokopedia.com/*",
         "https://tokopedia.com/*"
       ],
       "js": [
         "static/contents/tokopedia.tsx"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://shopee.co.id/*"
+      ],
+      "js": [
+        "static/contents/shopee.tsx"
       ],
       "run_at": "document_idle"
     }

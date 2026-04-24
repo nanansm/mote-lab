@@ -135,6 +135,7 @@ export default function TokopediaOverlay() {
         setStatus("sending");
 
         const batch = scraped.slice(0, 50);
+        console.log("[Mote LAB] Pushing Tokopedia products:", batch.length);
         const res = await new Promise<{ ok: boolean; queued?: number; offline?: boolean }>((resolve) =>
           chrome.runtime.sendMessage(
             { type: "INGEST_TOKOPEDIA_PRODUCTS", payload: { scraped_at: scrapedAt, page_url: pageUrl, data: batch } },
@@ -143,6 +144,9 @@ export default function TokopediaOverlay() {
         );
 
         if (res.ok) {
+          if (res.offline) {
+            console.log("[Mote LAB] Tokopedia products queued offline — will sync in background (max 5 min)");
+          }
           setStatus("done");
           if (quota) setQuota((q) => q && { ...q, used: q.used + (res.queued ?? batch.length) });
         } else {
