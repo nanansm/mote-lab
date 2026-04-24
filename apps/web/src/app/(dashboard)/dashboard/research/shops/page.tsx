@@ -9,6 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { StoreIcon, ExternalLinkIcon } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
 
+function fmt(n: number | null | undefined) {
+  if (!n) return "—";
+  return n.toLocaleString("id-ID");
+}
+
 export default async function ResearchShopsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
@@ -33,7 +38,7 @@ export default async function ResearchShopsPage() {
       ? await db.query.shops.findMany({ where: (s, { inArray }) => inArray(s.id, shopIds) })
       : [];
 
-  // Fetch omset estimates by joining products with shops via externalId
+  // Aggregate omset + sold + product count per shop via products.shopId = shops.externalId
   const shopExternalIds = shops.map((s) => s.externalId).filter(Boolean);
   const omsetRows =
     shopExternalIds.length > 0
@@ -42,6 +47,7 @@ export default async function ResearchShopsPage() {
             shopExternalId: schema.products.shopId,
             marketplace: schema.products.marketplace,
             totalOmset: sql<number>`COALESCE(SUM(${schema.products.currentPrice} * ${schema.products.totalSold}), 0)`,
+            totalSoldSum: sql<number>`COALESCE(SUM(${schema.products.totalSold}), 0)`,
             productCount: sql<number>`COUNT(*)::int`,
           })
           .from(schema.products)
@@ -122,8 +128,12 @@ export default async function ResearchShopsPage() {
             <tr className="border-b bg-slate-50">
               <th className="text-left px-4 py-3 text-slate-600 font-medium">Toko</th>
               <th className="text-left px-4 py-3 text-slate-600 font-medium">Platform</th>
-              <th className="text-right px-4 py-3 text-slate-600 font-medium">Followers</th>
+              <th className="text-right px-4 py-3 text-slate-600 font-medium">
+                <span className="block text-[10px] text-slate-400">Shopee: Pengikut</span>
+                <span className="block text-[10px] text-slate-400">Tokopedia: Ulasan</span>
+              </th>
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Produk</th>
+              <th className="text-right px-4 py-3 text-slate-600 font-medium">Total Terjual</th>
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Rating</th>
               <th className="text-right px-4 py-3 text-slate-600 font-medium">Est. Omset/Bln</th>
               <th className="px-4 py-3"></th>
@@ -133,6 +143,23 @@ export default async function ResearchShopsPage() {
             {shops.map((s) => {
               const omset = omsetMap.get(`${s.marketplace}__${s.externalId}`);
               const monthly = omset ? Number(omset.totalOmset) / 6 : null;
+              const isTokopedia = s.marketplace === "tokopedia";
+
+              // Followers / Ulasan
+              const audienceStat = isTokopedia
+                ? fmt(s.reviewCount)
+                : fmt(s.followerCount);
+
+              // Product count: Tokopedia → from scraped products; Shopee → from shop record
+              const productCount = isTokopedia
+                ? (omset ? Number(omset.productCount) : null)
+                : s.totalProducts;
+
+              // Total sold: Tokopedia → shop.totalSold (from header); Shopee → sum of products
+              const totalSold = isTokopedia
+                ? (s.totalSold > 0 ? s.totalSold : null)
+                : (omset ? Number(omset.totalSoldSum) : null);
+
               return (
                 <tr key={s.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
@@ -145,14 +172,16 @@ export default async function ResearchShopsPage() {
                     {s.username && <p className="text-xs text-slate-400">@{s.username}</p>}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
+                    <Badge
+                      variant="outline"
+                      className={`capitalize text-xs ${isTokopedia ? "border-green-300 text-green-700" : "border-orange-300 text-orange-700"}`}
+                    >
+                      {s.marketplace}
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-600">
-                    {s.followerCount?.toLocaleString("id-ID") ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-600">
-                    {s.totalProducts?.toLocaleString("id-ID") ?? "—"}
-                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{audienceStat}</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{fmt(productCount)}</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{fmt(totalSold)}</td>
                   <td className="px-4 py-3 text-right text-slate-600">
                     {s.rating ? `${s.rating.toFixed(1)} ★` : "—"}
                   </td>
@@ -176,6 +205,11 @@ export default async function ResearchShopsPage() {
         {shops.map((s) => {
           const omset = omsetMap.get(`${s.marketplace}__${s.externalId}`);
           const monthly = omset ? Number(omset.totalOmset) / 6 : null;
+          const isTokopedia = s.marketplace === "tokopedia";
+          const totalSold = isTokopedia
+            ? (s.totalSold > 0 ? s.totalSold : null)
+            : (omset ? Number(omset.totalSoldSum) : null);
+
           return (
             <Card key={s.id}>
               <CardContent className="p-4">
@@ -191,10 +225,17 @@ export default async function ResearchShopsPage() {
                   </a>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  <Badge variant="outline" className="capitalize text-xs">{s.marketplace}</Badge>
-                  {s.followerCount && (
-                    <span className="text-xs text-slate-500">{s.followerCount.toLocaleString("id-ID")} pengikut</span>
-                  )}
+                  <Badge
+                    variant="outline"
+                    className={`capitalize text-xs ${isTokopedia ? "border-green-300 text-green-700" : "border-orange-300 text-orange-700"}`}
+                  >
+                    {s.marketplace}
+                  </Badge>
+                  {isTokopedia
+                    ? s.reviewCount > 0 && <span className="text-xs text-slate-500">{fmt(s.reviewCount)} ulasan</span>
+                    : s.followerCount && <span className="text-xs text-slate-500">{fmt(s.followerCount)} pengikut</span>
+                  }
+                  {totalSold && <span className="text-xs text-slate-500">{fmt(totalSold)} terjual</span>}
                   {s.rating && <span className="text-xs text-slate-500">{s.rating.toFixed(1)} ★</span>}
                 </div>
                 {monthly !== null && (

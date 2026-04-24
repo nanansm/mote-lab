@@ -1,176 +1,152 @@
 import type { TokopediaProduct } from "../../types";
+import { detectTokopediaPageType } from "./detect";
 
-function parseSoldCount(str: string): number {
-  if (!str) return 0;
-  const s = str.trim();
+const BLOCKLIST = [
+  "help", "about", "contact", "login", "register", "cart", "p",
+  "category", "categories", "discovery", "play", "search", "find",
+  "promo", "flash-sale", "tokopoints", "gold-merchant", "official-store",
+];
 
-  // "Terjual X" prefix — strip it
-  const cleaned = s.replace(/^Terjual\s*/i, "").trim();
+// "100rb+ terjual" → 100000 | "4 jt terjual" → 4000000 | "500 terjual" → 500
+function parseSoldCount(text: string): number {
+  if (!text) return 0;
+  const cleaned = text.replace(/terjual/gi, "").replace(/\+/g, "").trim();
 
-  const rbMatch = cleaned.match(/([\d,.]+)\s*rb\+?/i);
-  if (rbMatch) {
-    const num = parseFloat(rbMatch[1].replace(/\./g, "").replace(",", "."));
-    return Math.round(num * 1_000);
-  }
-
-  const jtMatch = cleaned.match(/([\d,.]+)\s*jt\+?/i);
-  if (jtMatch) {
-    const num = parseFloat(jtMatch[1].replace(/\./g, "").replace(",", "."));
+  if (/jt/i.test(cleaned)) {
+    const num = parseFloat(cleaned.replace(/[^\d,]/g, "").replace(",", "."));
     return Math.round(num * 1_000_000);
   }
-
-  const plain = parseInt(cleaned.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
-  return isNaN(plain) ? 0 : plain;
-}
-
-function parsePrice(str: string): number {
-  if (!str) return 0;
-  // "Rp1.234.567" or "Rp 1.234.567"
-  const cleaned = str.replace(/[Rp\s.]/g, "").replace(",", ".");
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : Math.round(num);
-}
-
-function extractExternalId(url: string, shopUsername: string): string {
-  try {
-    const u = new URL(url);
-    const segments = u.pathname.split("/").filter(Boolean);
-    // tokopedia.com/{shop}/{product-slug}
-    if (segments.length >= 2) return `${segments[0]}__${segments[1]}`;
-    if (segments.length === 1) return `${shopUsername}__${segments[0]}`;
-  } catch {
-    // ignore
+  if (/rb/i.test(cleaned)) {
+    const num = parseFloat(cleaned.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1_000);
   }
-  return url;
+  if (/k/i.test(cleaned)) {
+    const num = parseFloat(cleaned.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1_000);
+  }
+  return parseInt(cleaned.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-function scrapeProductCard(el: Element): TokopediaProduct | null {
-  // Name
-  const nameEl =
-    el.querySelector('[data-testid="spnSRPProdName"]') ||
-    el.querySelector('[class*="prd_link-product-name"]') ||
-    el.querySelector('span[class*="name"]');
-  const name = nameEl?.textContent?.trim() ?? "";
+function parseCardText(card: HTMLElement, shopSlug: string, pageType: string): TokopediaProduct | null {
+  const text = (card as HTMLElement).innerText ?? "";
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // NAME: first line longer than 15 chars that isn't a price, discount, or noise
+  const nameIdx = lines.findIndex(
+    (l) =>
+      l.length > 15 &&
+      !l.startsWith("Rp") &&
+      !/^\d+%$/.test(l) &&
+      !/^-\d+%$/.test(l) &&
+      !/terjual/i.test(l) &&
+      !/hemat/i.test(l) &&
+      !/cashback/i.test(l),
+  );
+  const name = nameIdx >= 0 ? lines[nameIdx] : "";
   if (!name) return null;
 
-  // URL
-  const linkEl =
-    el.querySelector('[data-testid="lnkProductContainer"]') ||
-    el.querySelector('a[href*="tokopedia.com"]') ||
-    el.closest("a");
-  const rawUrl = linkEl instanceof HTMLAnchorElement ? linkEl.href : (linkEl?.getAttribute("href") ?? "");
-  if (!rawUrl) return null;
+  // PRICE: lines matching "RpNNN.NNN"
+  const priceLines = lines.filter((l) => /^Rp[\d.]+$/.test(l));
+  const currentPrice = priceLines[0] ? parseInt(priceLines[0].replace(/[^\d]/g, ""), 10) : 0;
+  const originalPrice = priceLines[1] ? parseInt(priceLines[1].replace(/[^\d]/g, ""), 10) : currentPrice;
 
-  // Price
-  const priceEl =
-    el.querySelector('[data-testid="spnSRPProdPrice"]') ||
-    el.querySelector('[class*="prd_link-product-price"]') ||
-    el.querySelector('span[class*="price"]');
-  const current_price = parsePrice(priceEl?.textContent ?? "");
+  // RATING: "X.Y" standalone
+  const ratingLine = lines.find((l) => /^\d\.\d$/.test(l));
+  const rating = ratingLine ? parseFloat(ratingLine) : undefined;
 
-  // Sold count
-  const soldEl =
-    el.querySelector('[data-testid="spnSRPProdLabel"]') ||
-    el.querySelector('[class*="prd_label-integrity"]') ||
-    el.querySelector('span[class*="sold"]');
-  const total_sold = parseSoldCount(soldEl?.textContent ?? "");
+  // SOLD: line containing "terjual"
+  const soldLine = lines.find((l) => /terjual/i.test(l)) ?? "";
+  const totalSold = parseSoldCount(soldLine);
 
-  // Rating
-  const ratingEl =
-    el.querySelector('[data-testid="spnSRPProdRating"]') ||
-    el.querySelector('[class*="prd_rating-average-text"]');
-  const ratingText = ratingEl?.textContent?.trim() ?? "";
-  const rating = ratingText ? parseFloat(ratingText) : undefined;
+  // SHOP NAME: on shop page use h1; on search page it follows the sold line
+  const soldIdx = lines.findIndex((l) => /terjual/i.test(l));
+  const shopName =
+    pageType === "shop"
+      ? (document.querySelector("h1")?.textContent?.trim() || shopSlug)
+      : (lines[soldIdx + 1] || shopSlug);
 
-  // Shop name / location
-  const shopLocEl = el.querySelector('[data-testid="spnSRPProdTabShopLoc"]');
-  const shopLocText = shopLocEl?.textContent?.trim() ?? "";
-  // Format can be "ShopName · Location" or just location
-  const shopLocParts = shopLocText.split("·").map((p) => p.trim());
-  const shop_name = shopLocParts.length > 1 ? shopLocParts[0] : undefined;
-  const location = shopLocParts.length > 1 ? shopLocParts[1] : shopLocParts[0] || undefined;
+  // LOCATION: Indonesian city/region prefix
+  const locationLine =
+    lines.find((l) =>
+      /^(Kab\.|Kota|Jakarta|Tangerang|Bandung|Surabaya|Medan|Semarang|Yogyakarta|Bali|Bekasi|Depok|Bogor|Luar Negeri)/i.test(l),
+    ) ?? "";
 
-  // Extract shop username from URL /{shop}/{product-slug} — used as shop_id for the DB join
-  const url = rawUrl.split("?")[0];
-  let shop_id: string | undefined;
-  try {
-    const segments = new URL(url).pathname.split("/").filter(Boolean);
-    if (segments.length >= 1) shop_id = segments[0];
-  } catch {
-    // ignore
-  }
-  const shopUsername = shop_id ?? "";
-  const external_id = extractExternalId(url, shopUsername);
+  const img = card.querySelector<HTMLImageElement>("img");
+  const imageUrl = img?.src || img?.srcset?.split(" ")[0] || "";
 
   return {
-    external_id,
+    external_id: "",  // filled by caller after URL parsing
     name,
-    url,
-    current_price,
-    total_sold,
-    rating: rating && !isNaN(rating) ? rating : undefined,
-    shop_id,
-    shop_name,
-    location,
+    url: "",          // filled by caller
+    current_price: currentPrice,
+    original_price: originalPrice,
+    total_sold: totalSold,
+    rating,
+    shop_id: shopSlug,
+    shop_name: shopName || undefined,
+    image_url: imageUrl || undefined,
+    location: locationLine || undefined,
   };
 }
 
 export function scrapeTokopediaProductList(): TokopediaProduct[] {
-  const results: TokopediaProduct[] = [];
-  const seen = new Set<string>();
+  const pageType = detectTokopediaPageType();
+  console.log("[Tokopedia Scraper] Page type:", pageType, "| URL:", window.location.href);
 
-  // Try primary selector: divProductWrapper
-  let containers = Array.from(document.querySelectorAll('[data-testid="divProductWrapper"]'));
+  if (pageType !== "search" && pageType !== "shop") return [];
 
-  // Fallback: lnkProductContainer parent
-  if (containers.length === 0) {
-    const links = document.querySelectorAll('[data-testid="lnkProductContainer"]');
-    containers = Array.from(links).map((l) => l.closest("div") ?? l) as Element[];
-  }
+  // Collect unique product links: href pattern /{shop_slug}/{product_slug}
+  const allLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="tokopedia.com/"]'));
+  const seenSlugs = new Set<string>();
+  const productLinks: { link: HTMLAnchorElement; shopSlug: string; productSlug: string }[] = [];
 
-  // Fallback: generic product grid items
-  if (containers.length === 0) {
-    containers = Array.from(document.querySelectorAll('div[class*="css-"][data-theme="default"] > a'));
-  }
-
-  console.log("[Tokopedia Scraper] Found", containers.length, "product containers");
-
-  for (const el of containers) {
-    const product = scrapeProductCard(el);
-    if (!product || seen.has(product.external_id)) continue;
-    seen.add(product.external_id);
-    results.push(product);
-  }
-
-  // If still empty, try scraping from JSON-LD or window.__cache__
-  if (results.length === 0) {
+  for (const a of allLinks) {
     try {
-      const jsonLdEls = document.querySelectorAll('script[type="application/ld+json"]');
-      for (const el of jsonLdEls) {
-        const data = JSON.parse(el.textContent ?? "{}");
-        if (data["@type"] === "ItemList" && Array.isArray(data.itemListElement)) {
-          for (const item of data.itemListElement) {
-            const product = item.item ?? item;
-            if (!product.name || !product.url) continue;
-            const id = product.productID ?? product.sku ?? product.url;
-            if (seen.has(id)) continue;
-            seen.add(id);
-            results.push({
-              external_id: id,
-              name: product.name,
-              url: product.url,
-              current_price: product.offers?.price ?? 0,
-              total_sold: 0,
-              rating: product.aggregateRating?.ratingValue,
-            });
-          }
-        }
-      }
+      const url = new URL(a.href);
+      if (!url.hostname.includes("tokopedia.com")) continue;
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts.length !== 2) continue;
+      if (BLOCKLIST.includes(parts[0])) continue;
+
+      const key = `${parts[0]}/${parts[1]}`;
+      if (seenSlugs.has(key)) continue;
+      seenSlugs.add(key);
+
+      productLinks.push({ link: a, shopSlug: parts[0], productSlug: parts[1] });
     } catch {
-      // ignore JSON-LD parse errors
+      // invalid URL
     }
   }
 
-  console.log("[Tokopedia Scraper] Scraped", results.length, "products");
+  console.log("[Tokopedia Scraper] Unique product links found:", productLinks.length);
+
+  const results: TokopediaProduct[] = [];
+
+  for (let i = 0; i < productLinks.length; i++) {
+    const { link, shopSlug, productSlug } = productLinks[i];
+    try {
+      // Walk up the DOM tree to find the card container that has price + sold/rating info
+      let card: HTMLElement = link as HTMLElement;
+      for (let depth = 0; depth < 8; depth++) {
+        if (!card.parentElement) break;
+        card = card.parentElement as HTMLElement;
+        const text = card.innerText ?? "";
+        if (text.includes("Rp") && (/terjual/i.test(text) || /\d\.\d/.test(text))) break;
+      }
+
+      const product = parseCardText(card, shopSlug, pageType);
+      if (!product) continue;
+
+      const cleanUrl = link.href.split("?")[0];
+      product.external_id = `${shopSlug}__${productSlug}`;
+      product.url = cleanUrl;
+
+      results.push(product);
+    } catch (err) {
+      console.error("[Tokopedia Scraper] Error parsing item", i, err);
+    }
+  }
+
+  console.log("[Tokopedia Scraper] Parsed", results.length, "products");
   return results;
 }

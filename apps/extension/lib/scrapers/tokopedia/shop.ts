@@ -1,85 +1,81 @@
 import type { TokopediaShop } from "../../types";
 
+// "436,6 rb" → 436600 | "4 jt" → 4000000 | "1.234" → 1234
 function parseCountString(str: string): number {
   if (!str) return 0;
   const clean = str.trim();
 
-  // "5,6rb" / "44,4RB" → thousands
-  const rbMatch = clean.match(/^([\d,.]+)\s*rb\+?$/i);
-  if (rbMatch) {
-    const num = parseFloat(rbMatch[1].replace(/\./g, "").replace(",", "."));
+  if (/jt/i.test(clean)) {
+    const num = parseFloat(clean.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1_000_000);
+  }
+  if (/rb/i.test(clean)) {
+    const num = parseFloat(clean.replace(/[^\d,]/g, "").replace(",", "."));
+    return Math.round(num * 1_000);
+  }
+  if (/k/i.test(clean)) {
+    const num = parseFloat(clean.replace(/[^\d,]/g, "").replace(",", "."));
     return Math.round(num * 1_000);
   }
 
-  // "1,2jt" / "1,7JT" → millions
-  const jtMatch = clean.match(/^([\d,.]+)\s*jt\+?$/i);
-  if (jtMatch) {
-    const num = parseFloat(jtMatch[1].replace(/\./g, "").replace(",", "."));
-    return Math.round(num * 1_000_000);
-  }
-
-  const plain = parseInt(clean.replace(/\./g, "").replace(/[^\d]/g, ""), 10);
-  return isNaN(plain) ? 0 : plain;
-}
-
-function extractLabeled(bodyText: string, ...labels: string[]): string {
-  for (const label of labels) {
-    const pattern = new RegExp(`${label}:\\s*([^\\n]+)`, "i");
-    const value = bodyText.match(pattern)?.[1]?.trim();
-    if (value) return value;
-  }
-  return "";
+  // Plain number with dot as thousands separator
+  return parseInt(clean.replace(/\./g, "").replace(/[^\d]/g, ""), 10) || 0;
 }
 
 export function scrapeTokopediaShop(): TokopediaShop | null {
-  const pathname = window.location.pathname;
-  const username = pathname.split("/").filter(Boolean)[0];
+  const username = window.location.pathname.split("/").filter(Boolean)[0];
   if (!username) {
-    console.log("[Tokopedia Shop] No username in pathname:", pathname);
+    console.log("[Tokopedia Shop] No username in pathname");
     return null;
   }
 
-  const nameEl =
-    document.querySelector('[data-testid="shopNameHeader"]') ||
-    document.querySelector('[data-testid="shopName"]');
-  const shopName =
-    nameEl?.textContent?.trim() ||
-    document.title.split("|")[0].trim() ||
-    username;
+  // Shop name from h1
+  const shopName = document.querySelector("h1")?.textContent?.trim() || username;
 
   const bodyText = document.body.innerText;
 
-  // Tokopedia shop stat rows use the same "Label: value" format as Shopee
-  const produkRaw = extractLabeled(bodyText, "Produk", "Products");
-  const pengikutRaw = extractLabeled(bodyText, "Pengikut", "Followers");
-  const penilaianRaw = extractLabeled(bodyText, "Penilaian", "Rating");
+  // Header stat format: "4.9 (436,6 rb) • 4 jt terjual"
+  // or: "4.9 (1,2 rb) • 500 terjual"
+  const headerMatch = bodyText.match(
+    /(\d+\.\d+)\s*\(([\d,.\s]+(?:rb|jt|k|m)?)\s*\)\s*[•·]\s*([\d,.\s]+(?:rb|jt|k|m)?)\s*terjual/i,
+  );
 
-  const total_products = parseCountString(produkRaw);
-  const follower_count = parseCountString(pengikutRaw);
+  let rating: number | undefined;
+  let review_count = 0;
+  let total_sold = 0;
 
-  const ratingMatch = penilaianRaw.match(/^(\d+[.,]\d+)/);
-  const rating = ratingMatch ? parseFloat(ratingMatch[1].replace(",", ".")) : undefined;
+  if (headerMatch) {
+    rating = parseFloat(headerMatch[1]);
+    review_count = parseCountString(headerMatch[2]);
+    total_sold = parseCountString(headerMatch[3]);
+  } else {
+    // Fallback: find rating standalone "X.Y" near start of body
+    const ratingMatch = bodyText.match(/(?:^|\n)\s*(\d\.\d)\s*(?:\n|$)/m);
+    if (ratingMatch) rating = parseFloat(ratingMatch[1]);
+  }
 
-  // Location: "Dikirim dari Jakarta" or city listed near shop header
-  const locationMatch = bodyText.match(/(?:Dikirim dari|Lokasi)\s*:\s*([^\n]+)/i);
-  const location = locationMatch?.[1]?.trim();
+  // Location: "Kab." or "Kota" prefix near shop info section
+  const lokasiMatch = bodyText.match(/(Kab\.|Kota)\s+[A-Z][a-zA-Z\s]+/);
+  const location = lokasiMatch ? lokasiMatch[0].trim() : undefined;
 
   const is_official =
-    document.querySelector('[data-testid="shopBadgeOS"]') !== null ||
-    /Official Store/i.test(bodyText);
+    /Power Merchant Pro/i.test(bodyText) ||
+    /Official Store/i.test(bodyText) ||
+    document.querySelector('[data-testid="shopBadgeOS"]') !== null;
 
-  console.log("[Tokopedia Shop] Raw labels:", { produk: produkRaw, pengikut: pengikutRaw, penilaian: penilaianRaw });
-  console.log("[Tokopedia Shop] Parsed:", { username, name: shopName, follower_count, total_products, rating, is_official });
+  console.log("[Tokopedia Shop] Parsed:", {
+    username, name: shopName, rating, review_count, total_sold, location, is_official,
+  });
 
   return {
     external_id: username,
     name: shopName,
     username,
     url: `https://www.tokopedia.com/${username}`,
-    follower_count,
     rating: rating && !isNaN(rating) ? rating : undefined,
-    total_products,
-    location,
+    review_count,
+    total_sold,
     is_official,
+    location,
   };
 }

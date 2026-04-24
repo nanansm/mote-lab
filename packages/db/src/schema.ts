@@ -205,6 +205,8 @@ export const shops = pgTable(
     joinedDate: text("joined_date"),
     location: text("location"),
     isOfficial: boolean("is_official").default(false),
+    reviewCount: integer("review_count").notNull().default(0),
+    totalSold: integer("total_sold").notNull().default(0),
     firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
   },

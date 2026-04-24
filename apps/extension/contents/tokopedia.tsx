@@ -43,8 +43,8 @@ export const getRootContainer = async () => {
 type Status = "idle" | "scraping" | "sending" | "done" | "error" | "unauthenticated";
 
 const PAGE_TYPE_LABEL: Record<TokopediaPageType, string> = {
-  "product-list": "List Produk",
-  "product-detail": "Detail Produk",
+  "search": "Hasil Pencarian",
+  "product": "Detail Produk",
   "shop": "Toko",
   "unknown": "Tidak Didukung",
 };
@@ -100,7 +100,7 @@ export default function TokopediaOverlay() {
         return;
       }
 
-      if (pageType === "product-list" || pageType === "shop") {
+      if (pageType === "search" || pageType === "shop") {
         // For shop pages: push shop info first
         if (pageType === "shop") {
           const shop = await new Promise<ReturnType<typeof scrapeTokopediaShop>>((resolve) => {
@@ -149,7 +149,7 @@ export default function TokopediaOverlay() {
           setStatus("error");
           setError("Gagal mengirim data");
         }
-      } else if (pageType === "product-detail") {
+      } else if (pageType === "product") {
         const product = await new Promise<ReturnType<typeof scrapeTokopediaProductDetail>>((resolve) => {
           requestIdleCallback(() => resolve(scrapeTokopediaProductDetail()), { timeout: 3000 });
         });

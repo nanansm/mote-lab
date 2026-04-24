@@ -56,6 +56,8 @@ export interface TokopediaShop {
   follower_count?: number;
   rating?: number;
   total_products?: number;
+  review_count?: number;
+  total_sold?: number;
   joined_date?: string;
   location?: string;
   is_official?: boolean;

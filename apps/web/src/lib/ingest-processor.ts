@@ -134,7 +134,7 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
         const payload = raw as unknown as TokopediaShopIngest;
         const s = payload.data;
         const shopId = `tokopedia_shop_${s.external_id}`;
-        console.log("[Shop Ingest] tokopedia", s.external_id, { follower_count: s.follower_count, total_products: s.total_products });
+        console.log("[Shop Ingest] tokopedia", s.external_id, { rating: s.rating, review_count: s.review_count, total_sold: s.total_sold });
         await db.insert(schema.shops).values({
           id: shopId,
           marketplace: "tokopedia",
@@ -145,6 +145,8 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
           followerCount: s.follower_count ?? null,
           rating: s.rating ?? null,
           totalProducts: s.total_products ?? null,
+          reviewCount: s.review_count ?? 0,
+          totalSold: s.total_sold ?? 0,
           joinedDate: s.joined_date ?? null,
           location: s.location ?? null,
           isOfficial: s.is_official ?? false,
@@ -158,6 +160,8 @@ export async function processQueueItems(queueIds: string[]): Promise<void> {
             followerCount: s.follower_count ?? null,
             rating: s.rating ?? null,
             totalProducts: s.total_products ?? null,
+            reviewCount: s.review_count ?? 0,
+            totalSold: s.total_sold ?? 0,
             location: s.location ?? null,
             isOfficial: s.is_official ?? false,
             lastSeenAt: new Date(),

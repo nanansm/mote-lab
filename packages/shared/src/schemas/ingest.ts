@@ -71,6 +71,8 @@ export const tokopediaShopSchema = z.object({
   follower_count: z.number().int().nonnegative().optional(),
   rating: z.number().min(0).max(5).optional(),
   total_products: z.number().int().nonnegative().optional(),
+  review_count: z.number().int().nonnegative().optional(),
+  total_sold: z.number().int().nonnegative().optional(),
   joined_date: z.string().optional(),
   location: z.string().optional(),
   is_official: z.boolean().optional(),
