@@ -54,9 +54,19 @@ function parseCardText(card: HTMLElement, shopSlug: string, pageType: string): T
   const ratingLine = lines.find((l) => /^\d\.\d$/.test(l));
   const rating = ratingLine ? parseFloat(ratingLine) : undefined;
 
-  // SOLD: line containing "terjual"
-  const soldLine = lines.find((l) => /terjual/i.test(l)) ?? "";
-  const totalSold = parseSoldCount(soldLine);
+  // SOLD: prefer a line where the NUMBER is directly adjacent to "terjual" on the same token
+  // e.g. "100rb+ terjual" or "50 terjual" — avoid matching shop-level "4 jt terjual" headers
+  // that bleed in when card walks up to a large container.
+  const soldLine = lines.find((l) => /^[\d,.]+\s*(?:rb|jt|k|m)?\+?\s*terjual$/i.test(l)) ??
+    lines.find((l) => /terjual/i.test(l)) ?? "";
+
+  const rawSold = parseSoldCount(soldLine);
+  // Sanity cap: no individual product realistically sells more than 10 million units
+  const MAX_PRODUCT_SOLD = 10_000_000;
+  const totalSold = Math.min(rawSold, MAX_PRODUCT_SOLD);
+  if (rawSold > MAX_PRODUCT_SOLD) {
+    console.warn("[Tokopedia Scraper] Clamped suspiciously high sold:", name, "|", soldLine, "→", rawSold, "(clamped to", MAX_PRODUCT_SOLD, ")");
+  }
 
   // SHOP NAME: on shop page use h1; on search page it follows the sold line
   const soldIdx = lines.findIndex((l) => /terjual/i.test(l));

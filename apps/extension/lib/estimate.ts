@@ -37,15 +37,27 @@ export const aggregateEstimate = (
     return { totalOmset: 0, monthlyOmset: 0, avgMonthlyPerProduct: 0, productCount: 0 };
   }
 
-  const estimates = products.map(estimateProductOmset);
+  // Filter out products with implausible omset — likely parse errors (e.g. shop-header text
+  // bleeding into a product card). Cap at 100 billion per individual product.
+  const MAX_INDIVIDUAL_OMSET = 100_000_000_000;
+  const valid = products.filter((p) => {
+    const omset = p.current_price * p.total_sold;
+    return omset >= 0 && omset <= MAX_INDIVIDUAL_OMSET;
+  });
+
+  if (valid.length < products.length) {
+    console.warn("[estimate] Dropped", products.length - valid.length, "outlier product(s) from estimate");
+  }
+
+  const estimates = valid.map(estimateProductOmset);
   const totalOmset = estimates.reduce((sum, e) => sum + e.totalOmset, 0);
   const monthlyOmset = estimates.reduce((sum, e) => sum + e.monthlyOmset, 0);
 
   return {
     totalOmset,
     monthlyOmset,
-    avgMonthlyPerProduct: monthlyOmset / products.length,
-    productCount: products.length,
+    avgMonthlyPerProduct: valid.length > 0 ? monthlyOmset / valid.length : 0,
+    productCount: valid.length,
   };
 };
 

@@ -46,8 +46,8 @@ export default async function ResearchShopsPage() {
           .select({
             shopExternalId: schema.products.shopId,
             marketplace: schema.products.marketplace,
-            totalOmset: sql<number>`COALESCE(SUM(${schema.products.currentPrice} * ${schema.products.totalSold}), 0)`,
-            totalSoldSum: sql<number>`COALESCE(SUM(${schema.products.totalSold}), 0)`,
+            totalOmset: sql<number>`COALESCE(SUM(${schema.products.currentPrice}::bigint * ${schema.products.totalSold}::bigint), 0)`,
+            totalSoldSum: sql<number>`COALESCE(SUM(${schema.products.totalSold}::bigint), 0)`,
             productCount: sql<number>`COUNT(*)::int`,
           })
           .from(schema.products)
